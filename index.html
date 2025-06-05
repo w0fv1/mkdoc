@@ -60,8 +60,11 @@
             font-weight: bold;
             color: #c9d1d9; /* GitHub Dark Text */
         }
+        .file { /* Style for non-markdown files */
+            color: #8b949e; /* GitHub Dark Secondary Text */
+        }
         .file-md {
-            /* 可以为 Markdown 文件添加特定样式，如果需要 */
+            /* Can add specific styles for Markdown files if needed */
         }
 
 
@@ -116,75 +119,73 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.2.12/marked.min.js"></script>
 
+    <!-- 1. Application Configuration -->
     <script>
-        // --- 配置 ---
-        // 自动从 GitHub Pages URL 推断，或者手动配置
-        // 例如：对于 https://username.github.io/my-repo/
-        // let GITHUB_OWNER = "username";
-        // let GITHUB_REPO = "my-repo";
-        // let GITHUB_BRANCH = "gh-pages"; // 或者 "main" 如果 Pages 从 main 的 /docs 文件夹部署
-        // let PAGES_ROOT_IN_REPO = ""; // 如果 Pages 从仓库根目录部署
-        // let PAGES_ROOT_IN_REPO = "docs"; // 如果 Pages 从 main 分支的 /docs 文件夹部署
+        const AppConfig = {
+            GITHUB_OWNER: null,
+            GITHUB_REPO: null,
+            // --- 用户可能需要根据实际情况修改以下配置 ---
+            // GitHub Pages 发布源的分支 (e.g., 'main', 'master', 'gh-pages')
+            GITHUB_BRANCH: 'main',
+            // 如果 GitHub Pages 是从仓库的子目录 (如 'docs') 发布的，请设置此项
+            // 例如: 'docs'。如果从根目录发布，则留空 ''
+            PAGES_ROOT_IN_REPO: '',
+            // --------------------------------------------
+            DEFAULT_MARKDOWN_FILE: 'README.md',
+            API_BASE_URL: 'https://api.github.com',
+            // 如果是私有仓库，需要设置 Personal Access Token (不推荐直接硬编码在前端)
+            // GITHUB_TOKEN: 'YOUR_PERSONAL_ACCESS_TOKEN_HERE',
 
-        let GITHUB_OWNER;
-        let GITHUB_REPO;
-        let GITHUB_BRANCH = 'main'; // 默认分支，通常是 main 或 master
-        let PAGES_ROOT_IN_REPO = ''; // 默认为空，表示 Pages 从仓库根目录部署
+            // DOM Element IDs
+            SIDEBAR_TREE_ID: 'directory-tree',
+            MAIN_CONTENT_ID: 'content'
+        };
+    </script>
 
+    <!-- 2. GitHub API Utilities -->
+    <script>
         function inferGitHubPagesConfig() {
-            const hostname = window.location.hostname; // e.g., "username.github.io"
-            const pathname = window.location.pathname; // e.g., "/repo-name/" or "/repo-name/path/to/page.html"
+            const hostname = window.location.hostname;
+            const pathname = window.location.pathname;
 
-            GITHUB_OWNER = hostname.split('.')[0];
+            AppConfig.GITHUB_OWNER = hostname.split('.')[0];
 
-            // 尝试推断仓库名和分支
-            // 1. 用户/组织页面: username.github.io
-            if (hostname === `${GITHUB_OWNER}.github.io` && (pathname === '/' || pathname.split('/')[1] === '' || !pathname.split('/')[1])) {
-                GITHUB_REPO = `${GITHUB_OWNER}.github.io`;
-                GITHUB_BRANCH = 'main'; // 或者 'master'，通常用户页面是 main/master 分支根目录
-                PAGES_ROOT_IN_REPO = '';
-            }
-            // 2. 项目页面: username.github.io/repo-name/
-            else {
-                const pathSegments = pathname.split('/').filter(Boolean); // ["repo-name", "path", "to", "page.html"]
+            if (hostname === `${AppConfig.GITHUB_OWNER}.github.io`) { // 用户/组织页面
+                AppConfig.GITHUB_REPO = `${AppConfig.GITHUB_OWNER}.github.io`;
+                // 对于用户/组织页面，通常 GITHUB_BRANCH 是 'main' 或 'master'，PAGES_ROOT_IN_REPO 是 ''
+                // AppConfig.GITHUB_BRANCH 保持默认 'main'
+                // AppConfig.PAGES_ROOT_IN_REPO 保持默认 ''
+            } else { // 项目页面 (username.github.io/repo-name/)
+                const pathSegments = pathname.split('/').filter(Boolean);
                 if (pathSegments.length > 0) {
-                    GITHUB_REPO = pathSegments[0];
-                    // 对于项目页面，GitHub Pages 通常从 gh-pages 分支的根目录，
-                    // 或者 main/master 分支的 /docs 目录，或者 main/master 分支的根目录。
-                    // 这里我们做一个合理的猜测，但可能需要用户根据实际情况调整。
-                    // 默认猜测是 gh-pages 分支，如果不是，用户需要手动修改 GITHUB_BRANCH 和 PAGES_ROOT_IN_REPO
-                    GITHUB_BRANCH = 'gh-pages'; // 这是一个常见的设置
-                    // 检查是否可能从 main/master 的 /docs 部署 (这是一个启发式方法，不完美)
-                    // 或者从 main/master 根目录部署
-                    // 为了简化，我们先假设 gh-pages 或 main/master 根目录
-                    // 如果用 main/master + /docs, 用户需要设置 PAGES_ROOT_IN_REPO = "docs" 和 GITHUB_BRANCH = "main"
-
+                    AppConfig.GITHUB_REPO = pathSegments[0];
+                    // 对于项目页面，发布源可能是 'main'/'master' 的根目录或 '/docs'，也可能是 'gh-pages' 分支。
+                    // AppConfig.GITHUB_BRANCH 和 AppConfig.PAGES_ROOT_IN_REPO 保持默认。
+                    // 用户需要根据实际情况在 AppConfig 中调整。
+                    // 例如，如果从 'gh-pages' 分支发布，则设置 AppConfig.GITHUB_BRANCH = 'gh-pages';
+                    // 例如，如果从 'main' 分支的 'docs' 目录发布，则设置 AppConfig.PAGES_ROOT_IN_REPO = 'docs';
                 } else {
-                     // 这种情况比较少见，可能是根域名直接指向一个 Pages 仓库但不是 user/org page
-                     // 需要用户手动配置
-                    console.warn("无法完全自动推断仓库名，请检查或手动配置 GITHUB_REPO。");
-                    GITHUB_REPO = `${GITHUB_OWNER}.github.io`; //  fallback
+                    console.warn("无法从路径推断项目仓库名。请检查 AppConfig 或手动配置。");
+                    AppConfig.GITHUB_REPO = `${AppConfig.GITHUB_OWNER}.github.io`; // Fallback
                 }
             }
-             console.log(`推断配置: Owner=${GITHUB_OWNER}, Repo=${GITHUB_REPO}, Branch=${GITHUB_BRANCH}, RootInRepo=${PAGES_ROOT_IN_REPO}`);
+            console.log(`推断配置: Owner=${AppConfig.GITHUB_OWNER}, Repo=${AppConfig.GITHUB_REPO}. (请确认 Branch: ${AppConfig.GITHUB_BRANCH}, Pages Root: '${AppConfig.PAGES_ROOT_IN_REPO}' 是否正确)`);
         }
 
-        // --- GitHub API 调用 ---
         async function fetchGitHubTree() {
-            if (!GITHUB_OWNER || !GITHUB_REPO || !GITHUB_BRANCH) {
-                console.error("GitHub 配置不完整！");
+            if (!AppConfig.GITHUB_OWNER || !AppConfig.GITHUB_REPO || !AppConfig.GITHUB_BRANCH) {
+                console.error("GitHub 配置不完整！ (Owner, Repo, Branch)");
                 return null;
             }
-            const apiUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/git/trees/${GITHUB_BRANCH}?recursive=1`;
+            const apiUrl = `${AppConfig.API_BASE_URL}/repos/${AppConfig.GITHUB_OWNER}/${AppConfig.GITHUB_REPO}/git/trees/${AppConfig.GITHUB_BRANCH}?recursive=1`;
             console.log(`Fetching tree from: ${apiUrl}`);
             try {
-                const response = await fetch(apiUrl, {
-                    headers: {
-                        "Accept": "application/vnd.github.v3+json"
-                        // 如果是私有仓库，需要添加 Authorization header:
-                        // "Authorization": "token YOUR_PERSONAL_ACCESS_TOKEN"
-                    }
-                });
+                const headers = { "Accept": "application/vnd.github.v3+json" };
+                if (AppConfig.GITHUB_TOKEN) { // 用于私有仓库
+                    // headers["Authorization"] = `token ${AppConfig.GITHUB_TOKEN}`;
+                    console.warn("注意：在前端使用 GitHub Token 有安全风险。");
+                }
+                const response = await fetch(apiUrl, { headers });
                 if (!response.ok) {
                     const errorData = await response.json();
                     throw new Error(`GitHub API Error: ${response.status} - ${errorData.message}`);
@@ -193,43 +194,44 @@
                 if (data.truncated) {
                     console.warn("GitHub API 返回的树信息被截断，可能无法显示所有文件。");
                 }
-                return data.tree; // 返回文件/目录对象数组
+                return data.tree;
             } catch (error) {
                 console.error('获取 GitHub 目录树失败:', error);
-                document.getElementById('directory-tree').innerHTML = `<p style="color:red;">加载目录失败: ${error.message}</p><p>请检查控制台获取更多信息，并确认 GitHub 配置 (Owner, Repo, Branch, Pages Root) 是否正确。</p>`;
+                document.getElementById(AppConfig.SIDEBAR_TREE_ID).innerHTML =
+                    `<p style="color:red;">加载目录失败: ${error.message}</p>
+                     <p>请检查控制台获取更多信息，并确认 AppConfig 中的 GitHub 配置 (Owner, Repo, Branch, Pages Root) 是否正确。</p>`;
                 return null;
             }
         }
 
-        // --- 构建和渲染目录树 ---
         function buildTree(items) {
             const tree = {};
+            if (!items) return tree;
+
             items.forEach(item => {
-                // 如果 Pages 是从仓库的子目录（如 'docs/'）部署的，我们需要处理路径
                 let effectivePath = item.path;
-                if (PAGES_ROOT_IN_REPO && item.path.startsWith(PAGES_ROOT_IN_REPO + '/')) {
-                    effectivePath = item.path.substring(PAGES_ROOT_IN_REPO.length + 1);
-                } else if (PAGES_ROOT_IN_REPO && item.path === PAGES_ROOT_IN_REPO) {
-                    // 如果项目本身就是这个 docs 目录，则忽略
-                    return;
-                } else if (PAGES_ROOT_IN_REPO) {
-                    // 不在 PAGES_ROOT_IN_REPO 下的文件/目录，不显示
-                    return;
+                if (AppConfig.PAGES_ROOT_IN_REPO) {
+                    if (item.path.startsWith(AppConfig.PAGES_ROOT_IN_REPO + '/')) {
+                        effectivePath = item.path.substring(AppConfig.PAGES_ROOT_IN_REPO.length + 1);
+                    } else if (item.path === AppConfig.PAGES_ROOT_IN_REPO) { // The root dir itself
+                        return; // Don't list the root dir as an item if it's the base
+                    }
+                     else { // Not in the pages root, skip
+                        return;
+                    }
                 }
-                if (!effectivePath) return; // 忽略根路径本身
+                if (!effectivePath) return;
 
                 const parts = effectivePath.split('/');
                 let currentLevel = tree;
                 parts.forEach((part, index) => {
                     if (!currentLevel[part]) {
-                        currentLevel[part] = { _type: 'folder', _children: {} };
+                        currentLevel[part] = { _type: (item.type === 'tree' || index < parts.length -1) ? 'folder' : 'file', _children: {} };
                     }
-                    if (index === parts.length - 1) { // 最后一节
-                        if (item.type === 'blob') { // 文件
-                            currentLevel[part]._type = 'file';
-                            currentLevel[part]._path = effectivePath; // 存储相对于 Pages 部署根目录的路径
-                        } else if (item.type === 'tree') { // 目录 (API 也会列出目录本身)
-                             currentLevel[part]._type = 'folder';
+                    if (index === parts.length - 1) { // Last part
+                        currentLevel[part]._type = (item.type === 'blob') ? 'file' : 'folder';
+                        if (item.type === 'blob') {
+                             currentLevel[part]._path = effectivePath; // Store relative path for files
                         }
                     }
                     currentLevel = currentLevel[part]._children;
@@ -237,11 +239,13 @@
             });
             return tree;
         }
+    </script>
 
+    <!-- 3. Directory Renderer -->
+    <script>
         function renderTree(node, currentPath = '') {
             let html = '<ul>';
             const sortedKeys = Object.keys(node).sort((a, b) => {
-                // 文件夹优先，然后按字母排序
                 const aIsDir = node[a]._type === 'folder';
                 const bIsDir = node[b]._type === 'folder';
                 if (aIsDir && !bIsDir) return -1;
@@ -251,20 +255,18 @@
 
             for (const key of sortedKeys) {
                 const item = node[key];
-                const itemPath = item._path || (currentPath ? `${currentPath}/${key}` : key);
-
                 html += '<li>';
                 if (item._type === 'folder') {
                     html += `<span class="folder">${key}</span>`;
                     if (Object.keys(item._children).length > 0) {
-                        html += renderTree(item._children, itemPath);
+                        html += renderTree(item._children, item._path || (currentPath ? `${currentPath}/${key}` : key) );
                     }
                 } else if (item._type === 'file') {
+                    const filePath = item._path; // Should always exist for files from buildTree
                     if (key.toLowerCase().endsWith('.md')) {
-                        html += `<a href="#${itemPath}" class="file-md">${key}</a>`;
+                        html += `<a href="#${filePath}" class="file-md">${key}</a>`;
                     } else {
-                        // html += `<span>${key}</span>`; // 非 Markdown 文件，仅显示
-                        // 或者提供下载链接 (需要 item.url or sha to construct raw link if desired)
+                        html += `<span class="file">${key}</span>`; // Display non-markdown files as text
                     }
                 }
                 html += '</li>';
@@ -274,71 +276,87 @@
         }
 
         async function displayDirectoryTree() {
+            const directoryElement = document.getElementById(AppConfig.SIDEBAR_TREE_ID);
+            if (!directoryElement) {
+                console.error(`目录元素 #${AppConfig.SIDEBAR_TREE_ID} 未找到!`);
+                return;
+            }
+            directoryElement.innerHTML = '正在加载目录...';
             const treeItems = await fetchGitHubTree();
             if (treeItems) {
                 const directoryData = buildTree(treeItems);
                 const treeHtml = renderTree(directoryData);
-                document.getElementById('directory-tree').innerHTML = treeHtml || '<p>目录为空或无 Markdown 文件。</p>';
+                directoryElement.innerHTML = treeHtml || '<p>目录为空或未找到 Markdown 文件。</p>';
             }
         }
+    </script>
 
-        // --- Markdown 加载 ---
-        const contentDiv = document.getElementById('content');
-
+    <!-- 4. Markdown Renderer -->
+    <script>
         async function loadMarkdown(filename) {
+            const contentDiv = document.getElementById(AppConfig.MAIN_CONTENT_ID);
+            if (!contentDiv) {
+                console.error(`内容元素 #${AppConfig.MAIN_CONTENT_ID} 未找到!`);
+                return;
+            }
             console.log(`尝试加载 Markdown: ${filename}`);
             contentDiv.innerHTML = '正在加载...';
+            document.title = `加载中 - ${filename}`;
+
             try {
-                // 对于 GitHub Pages, filename 已经是相对于站点根目录的正确路径
-                const response = await fetch(filename);
+                const response = await fetch(filename); // filename is relative to site root
                 if (!response.ok) {
-                    throw new Error(`获取文件失败: ${response.status} ${response.statusText}`);
+                    throw new Error(`获取文件失败: ${response.status} ${response.statusText} (文件: ${filename})`);
                 }
                 const markdownText = await response.text();
                 const htmlContent = marked.parse(markdownText);
                 contentDiv.innerHTML = htmlContent;
-                document.title = filename; // 更新页面标题
+                document.title = filename;
                 console.log(`成功加载并渲染: ${filename}`);
             } catch (error) {
                 console.error('加载 Markdown 失败:', error);
                 contentDiv.innerHTML = `<p style="color:red;">加载 <strong>${filename}</strong> 失败。</p><p>${error.message}</p><p>请确保文件存在并且路径正确。</p>`;
-                document.title = "加载失败";
+                document.title = `加载失败 - ${filename}`;
             }
         }
+    </script>
 
+    <!-- 5. Main Application Logic -->
+    <script>
         function checkHashAndLoad() {
             let filename = window.location.hash.substring(1);
             if (!filename) {
-                // 尝试从目录树中找到第一个 Markdown 文件作为默认
-                const firstMdLink = document.querySelector('#directory-tree a.file-md');
+                const firstMdLink = document.querySelector(`#${AppConfig.SIDEBAR_TREE_ID} a.file-md`);
                 if (firstMdLink) {
                     filename = firstMdLink.getAttribute('href').substring(1);
-                     window.location.hash = '#' + filename; // 更新 hash，但不立即加载，让 hashchange 处理
-                     // loadMarkdown(filename); // 或者直接加载
-                     return; // 如果设置了 hash, hashchange 会处理
+                    // Update hash to reflect the default file, this will trigger hashchange again
+                    window.location.hash = '#' + filename;
+                    return; // Let the new hashchange event handle the loading
                 } else {
-                    filename = 'README.md'; // 默认回退
+                    filename = AppConfig.DEFAULT_MARKDOWN_FILE;
                 }
             }
-            if (!filename.toLowerCase().endsWith('.md') && filename !== 'README.md') {
-                 // 如果 hash 不是 .md 结尾，并且也不是默认的 README.md (因为它可能没有 .md 后缀)
-                 // 可以选择显示提示信息，或者尝试加载 README.md
-                 console.log(`非 Markdown 文件: ${filename}, 尝试加载 README.md`);
-                 if (filename !== 'README.md') filename = 'README.md'; // 避免死循环
+            // No specific check for .md here, as hash might point to a non-md file
+            // that the user intentionally wants to try (though loadMarkdown might fail)
+            // Or, we could enforce .md here or in loadMarkdown.
+            // For now, loadMarkdown will handle non-fetchable files.
+            if (filename) { // Only load if a filename is determined
+                loadMarkdown(filename);
+            } else {
+                 document.getElementById(AppConfig.MAIN_CONTENT_ID).innerHTML = `<p>请从目录中选择一个文件，或确保 <code>${AppConfig.DEFAULT_MARKDOWN_FILE}</code> 文件存在。</p>`;
+                 document.title = "请选择文件";
             }
-            loadMarkdown(filename);
         }
 
-        // --- 初始化 ---
         async function initializeApp() {
-            inferGitHubPagesConfig(); // 首先尝试自动推断配置
-            await displayDirectoryTree();  // 然后加载目录树
-            checkHashAndLoad();        // 最后根据 hash (或默认) 加载 Markdown
+            inferGitHubPagesConfig();
+            await displayDirectoryTree(); // Load directory first
+            checkHashAndLoad();       // Then load content based on hash or default
         }
 
         window.addEventListener('DOMContentLoaded', initializeApp);
         window.addEventListener('hashchange', checkHashAndLoad);
-
     </script>
+
 </body>
 </html>
