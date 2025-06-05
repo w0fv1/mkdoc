@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown 查看器</title>
+
+    <!-- 引入 GitHub 风格 Markdown 暗黑模式样式 -->
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.8.1/github-markdown-dark.min.css" />
+
+    <style>
+        /* 设置整页为暗色风格 */
+        body {
+            margin: 0;
+            background-color: #0d1117;
+            /* GitHub Dark 背景 */
+            color: #c9d1d9;
+            /* GitHub Dark 字体 */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+        }
+
+        .markdown-body {
+            box-sizing: border-box;
+            min-width: 200px;
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 45px;
+        }
+
+        @media (max-width: 767px) {
+            .markdown-body {
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="content" class="markdown-body">
+        正在加载...
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.2.12/marked.min.js"></script>
+
+    <script>
+        const contentDiv = document.getElementById('content');
+
+        async function loadMarkdown(filename) {
+            console.log(`尝试加载: ${filename}`);
+            contentDiv.innerHTML = '正在加载...';
+
+            const response = await fetch(filename);
+            const markdownText = await response.text();
+            const htmlContent = marked.parse(markdownText);
+            contentDiv.innerHTML = htmlContent;
+            console.log(`成功加载并渲染: ${filename}`);
+        }
+
+        function checkHashAndLoad() {
+            let filename = window.location.hash.substring(1);
+            if (!filename || !filename.toLowerCase().endsWith('.md')) {
+                filename = 'README.md';
+            }
+            loadMarkdown(filename);
+        }
+
+        window.addEventListener('DOMContentLoaded', checkHashAndLoad);
+        window.addEventListener('hashchange', checkHashAndLoad);
+    </script>
+
+</body>
+
+</html>
