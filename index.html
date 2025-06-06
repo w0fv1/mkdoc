@@ -4,11 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Markdown 查看器与目录</title>
-
-    <!-- 引入 GitHub 风格 Markdown 暗黑模式样式 -->
+    <title>Vue Markdown 查看器</title>
     <link rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.8.1/github-markdown-dark.min.css" />
+    <script src="https://unpkg.com/vue@2.7.16/dist/vue.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.2.12/marked.min.js"></script>
 
     <style>
         body {
@@ -16,27 +16,56 @@
             background-color: #0d1117;
             color: #c9d1d9;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
-            display: flex; /* 使用 Flexbox 布局 */
+            display: flex;
             min-height: 100vh;
+        }
+
+        #app { /* Vue app root */
+            display: flex;
+            width: 100%;
+            height: 100vh;
         }
 
         #sidebar {
             width: 280px;
             min-width: 200px;
             max-width: 400px;
-            background-color: #161b22; /* GitHub Darker Sidebar */
+            background-color: #161b22;
             padding: 20px;
             overflow-y: auto;
-            border-right: 1px solid #30363d; /* GitHub Dark Border */
-            height: 100vh; /* 使侧边栏撑满视口高度 */
+            border-right: 1px solid #30363d;
             box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
         }
 
         #sidebar h3 {
             margin-top: 0;
-            color: #8b949e; /* GitHub Dark Secondary Text */
+            color: #8b949e;
             border-bottom: 1px solid #30363d;
             padding-bottom: 10px;
+            flex-shrink: 0; /* Prevent h3 from shrinking */
+        }
+
+        #directory-error-display, #content-error-display {
+            background-color: #2c0b0b; /* Dark red background for errors */
+            color: #ff8383; /* Light red text for errors */
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #581e1e;
+            border-radius: 4px;
+            font-size: 0.9em;
+            white-space: pre-wrap; /* Preserve line breaks in error messages */
+            flex-shrink: 0; /* Prevent error display from shrinking */
+        }
+        #directory-error-display:empty, #content-error-display:empty {
+            display: none; /* Hide if no error */
+        }
+
+
+        #directory-tree-container {
+            flex-grow: 1; /* Allow tree to take remaining space and scroll */
+            overflow-y: auto;
         }
 
         #directory-tree ul {
@@ -49,7 +78,7 @@
         }
 
         #directory-tree a {
-            color: #58a6ff; /* GitHub Dark Link */
+            color: #58a6ff;
             text-decoration: none;
             cursor: pointer;
         }
@@ -58,47 +87,48 @@
         }
         .folder {
             font-weight: bold;
-            color: #c9d1d9; /* GitHub Dark Text */
+            color: #c9d1d9;
         }
-        .file { /* Style for non-markdown files */
-            color: #8b949e; /* GitHub Dark Secondary Text */
+        .file {
+            color: #8b949e;
         }
-        .file-md {
-            /* Can add specific styles for Markdown files if needed */
-        }
-
 
         #main-content {
-            flex-grow: 1; /* 主内容区域占据剩余空间 */
-            overflow-y: auto; /* 内容过多时主内容区滚动 */
-            height: 100vh; /* 主内容区域也撑满视口高度 */
+            flex-grow: 1;
+            overflow-y: auto;
             box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            padding: 20px; /* Add padding here instead of markdown-body for error display positioning */
         }
 
         .markdown-body {
             box-sizing: border-box;
             min-width: 200px;
             max-width: 980px;
-            margin: 0 auto;
-            padding: 45px;
+            margin: 0 auto; /* Center markdown content */
+            padding: 25px; /* Original padding for markdown content itself */
+            flex-grow: 1; /* Allow markdown body to take space */
         }
 
+
         @media (max-width: 767px) {
-            body {
-                flex-direction: column; /* 移动端上下布局 */
+            #app {
+                flex-direction: column;
             }
             #sidebar {
                 width: 100%;
                 max-width: none;
-                height: auto; /* 移动端高度自适应 */
-                max-height: 40vh; /* 给侧边栏一个最大高度 */
+                height: auto;
+                max-height: 40vh;
                 border-right: none;
                 border-bottom: 1px solid #30363d;
             }
             #main-content {
                 height: auto;
+                padding: 15px;
             }
-            .markdown-body {
+             .markdown-body {
                 padding: 15px;
             }
         }
@@ -106,366 +136,293 @@
 </head>
 
 <body>
-    <div id="sidebar">
-        <h3>文件目录</h3>
-        <div id="directory-tree">正在加载目录...</div>
-    </div>
+    <div id="app">
+        <div id="sidebar">
+            <h3>文件目录</h3>
+            <div id="directory-error-display" v-if="directoryError" v-html="directoryError"></div>
+            <div id="directory-tree-container">
+                <div v-if="isLoadingDirectory">正在加载目录...</div>
+                <div v-html="directoryTreeHtml" id="directory-tree"></div>
+            </div>
+        </div>
 
-    <div id="main-content">
-        <div id="content" class="markdown-body">
-            正在加载...
+        <div id="main-content">
+            <div id="content-error-display" v-if="contentError" v-html="contentError"></div>
+            <div id="content" class="markdown-body" v-html="renderedMarkdown">
+                <!-- Content will be rendered here by Vue -->
+            </div>
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.2.12/marked.min.js"></script>
-
-    <!-- 1. Application Configuration -->
     <script>
-        const AppConfig = {
-            // 是否自动推断 GitHub Owner 和 Repo。如果为 false，则必须手动设置下面的 GITHUB_OWNER 和 GITHUB_REPO。
-            AUTO_INFER_CONFIG: true,
+        // --- Vue Application ---
+        new Vue({
+            el: '#app',
+            data: {
+                config: { // Default configurations, can be overridden
+                    AUTO_INFER_CONFIG: true,
+                    GITHUB_OWNER: null,
+                    GITHUB_REPO: null,
+                    GITHUB_BRANCH: 'main',
+                    PAGES_ROOT_IN_REPO: '',
+                    DEFAULT_MARKDOWN_FILE: 'README.md',
+                    API_BASE_URL: 'https://api.github.com',
+                    // GITHUB_TOKEN: null,
+                },
+                isLoadingDirectory: true,
+                directoryTreeHtml: '',
+                directoryError: null, // For errors related to fetching/building directory
 
-            // --- 手动配置 (如果 AUTO_INFER_CONFIG 为 false，或需要覆盖自动推断) ---
-            // 将这些值设置为 null 以允许自动推断 (如果 AUTO_INFER_CONFIG 为 true)
-            GITHUB_OWNER: null,  // 例如: "w0fv1"
-            GITHUB_REPO: null,   // 例如: "mkdoc" 或 "w0fv1.github.io"
-            // --------------------------------------------------------------------
+                currentMarkdownPath: '',
+                renderedMarkdown: '正在加载...',
+                contentError: null, // For errors related to fetching/rendering markdown
 
-            // --- GitHub Pages 发布源设置 (通常需要根据实际情况调整) ---
-            GITHUB_BRANCH: 'main', // Pages 发布源的分支 (e.g., 'main', 'master', 'gh-pages')
-            // 如果 Pages 是从仓库的子目录 (如 'docs') 发布的，请设置此项。
-            // 例如: 'docs'。如果从仓库根目录发布，则留空 ''。
-            PAGES_ROOT_IN_REPO: '',
-            // -----------------------------------------------------------
-
-            DEFAULT_MARKDOWN_FILE: 'README.md',
-            API_BASE_URL: 'https://api.github.com',
-            // GITHUB_TOKEN: null, // 用于私有仓库 (不推荐直接硬编码)
-
-            // DOM Element IDs
-            SIDEBAR_TREE_ID: 'directory-tree',
-            MAIN_CONTENT_ID: 'content'
-        };
-    </script>
-
-    <!-- 2. GitHub API Utilities -->
-    <script>
-        function inferGitHubPagesConfig() {
-            console.log("[ConfigInfer] Starting configuration inference process...");
-            console.log(`[ConfigInfer] Initial AppConfig values: Owner=${AppConfig.GITHUB_OWNER}, Repo=${AppConfig.GITHUB_REPO}, Branch=${AppConfig.GITHUB_BRANCH}, Root='${AppConfig.PAGES_ROOT_IN_REPO}'`);
-            console.log(`[ConfigInfer] Current URL: Hostname='${window.location.hostname}', Pathname='${window.location.pathname}'`);
-
-            let inferredOwnerFromHostname = window.location.hostname.split('.')[0];
-            let inferredRepoFromPath = null;
-
-            // 检查是否是标准 GitHub Pages 域名 (owner.github.io)
-            if (window.location.hostname === `${inferredOwnerFromHostname}.github.io`) {
-                console.log("[ConfigInfer] Hostname matches 'owner.github.io' pattern.");
-                const pathSegments = window.location.pathname.split('/').filter(Boolean); // 移除空字符串
-
-                if (pathSegments.length > 0) {
-                    // 对于 owner.github.io/repo-name/ 结构，第一个路径段是仓库名
-                    inferredRepoFromPath = pathSegments[0];
-                    console.log(`[ConfigInfer] Potential GITHUB_REPO (project page type): '${inferredRepoFromPath}' from first path segment.`);
-                } else {
-                    // 对于 owner.github.io/ (无后续路径)，仓库名是 owner.github.io
-                    inferredRepoFromPath = `${inferredOwnerFromHostname}.github.io`;
-                    console.log(`[ConfigInfer] Potential GITHUB_REPO (user/org page type): '${inferredRepoFromPath}'.`);
-                }
-            } else {
-                // 自定义域名或其他非标准设置
-                console.warn(`[ConfigInfer] Hostname '${window.location.hostname}' is a custom domain or non-standard. Cannot reliably infer GITHUB_REPO. GITHUB_OWNER and GITHUB_REPO should be manually set in AppConfig.`);
-                // 对于自定义域名，我们无法从 URL 推断仓库名，但所有者可能仍可从 AppConfig.GITHUB_OWNER 获取
-                // 如果 GITHUB_OWNER 也未手动设置，inferredOwnerFromHostname 可能是错误的 (例如 www)
-            }
-
-            // 仅当 AppConfig 中的对应字段为 null (未手动设置) 时，才应用推断值
-            if (AppConfig.GITHUB_OWNER === null) {
-                AppConfig.GITHUB_OWNER = inferredOwnerFromHostname;
-                console.log(`[ConfigInfer] Applied inferred GITHUB_OWNER: '${AppConfig.GITHUB_OWNER}'`);
-            } else {
-                console.log(`[ConfigInfer] GITHUB_OWNER was manually set to: '${AppConfig.GITHUB_OWNER}'. Inference for owner skipped.`);
-            }
-
-            if (AppConfig.GITHUB_REPO === null && inferredRepoFromPath !== null) {
-                AppConfig.GITHUB_REPO = inferredRepoFromPath;
-                console.log(`[ConfigInfer] Applied inferred GITHUB_REPO: '${AppConfig.GITHUB_REPO}'`);
-            } else if (AppConfig.GITHUB_REPO !== null) {
-                console.log(`[ConfigInfer] GITHUB_REPO was manually set to: '${AppConfig.GITHUB_REPO}'. Inference for repo skipped.`);
-            } else { // AppConfig.GITHUB_REPO is null AND inferredRepoFromPath is null (e.g., custom domain)
-                console.warn(`[ConfigInfer] Could not apply inferred GITHUB_REPO (inference was not possible or yielded null). GITHUB_REPO remains: '${AppConfig.GITHUB_REPO}'. Manual configuration is likely required.`);
-            }
-
-            console.log(`[ConfigInfer] Effective config after inference: Owner='${AppConfig.GITHUB_OWNER}', Repo='${AppConfig.GITHUB_REPO}', Branch='${AppConfig.GITHUB_BRANCH}', PagesRoot='${AppConfig.PAGES_ROOT_IN_REPO}'`);
-            console.log("[ConfigInfer] Inference process complete.");
-        }
-
-        async function fetchGitHubTree() {
-            if (!AppConfig.GITHUB_OWNER || !AppConfig.GITHUB_REPO || !AppConfig.GITHUB_BRANCH) {
-                console.error("[API] GitHub fetchTree PRE-CHECK FAILED: Config incomplete! Owner, Repo, or Branch is missing.");
-                console.error(`[API] Current Config: Owner=${AppConfig.GITHUB_OWNER}, Repo=${AppConfig.GITHUB_REPO}, Branch=${AppConfig.GITHUB_BRANCH}`);
-                document.getElementById(AppConfig.SIDEBAR_TREE_ID).innerHTML =
-                    `<p style="color:red;"><strong>配置错误:</strong> GitHub Owner, Repository, 或 Branch 未设置。无法加载目录。</p>`;
-                return null;
-            }
-            const apiUrl = `${AppConfig.API_BASE_URL}/repos/${AppConfig.GITHUB_OWNER}/${AppConfig.GITHUB_REPO}/git/trees/${AppConfig.GITHUB_BRANCH}?recursive=1`;
-            console.log(`[API] Fetching tree from: ${apiUrl}`);
-            try {
-                const headers = { "Accept": "application/vnd.github.v3+json" };
-                if (AppConfig.GITHUB_TOKEN) {
-                    // headers["Authorization"] = `token ${AppConfig.GITHUB_TOKEN}`;
-                    console.warn("[API] 注意：在前端使用 GitHub Token 有安全风险。仅用于测试或受信任环境。");
-                }
-                const response = await fetch(apiUrl, { headers });
-                console.log(`[API] Fetch tree response status: ${response.status}`);
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({ message: "Unknown error, could not parse error response." }));
-                    console.error(`[API] GitHub API Error Data:`, errorData);
-                    throw new Error(`GitHub API Error: ${response.status} - ${errorData.message || 'No message'}`);
-                }
-                const data = await response.json();
-                if (data.truncated) {
-                    console.warn("[API] GitHub API 返回的树信息被截断 (truncated=true)，可能无法显示所有文件。");
-                }
-                console.log(`[API] Successfully fetched ${data.tree ? data.tree.length : 0} items from tree API.`);
-                return data.tree;
-            } catch (error) {
-                console.error('[API] 获取 GitHub 目录树失败:', error);
-                document.getElementById(AppConfig.SIDEBAR_TREE_ID).innerHTML =
-                    `<p style="color:red;">加载目录失败: ${error.message}</p>
-                     <p>请检查控制台获取更多信息，并确认 AppConfig 中的 GitHub 配置是否正确，以及网络连接是否正常。</p>`;
-                return null;
-            }
-        }
-
-        function buildTree(items) {
-            const tree = {};
-            if (!items) {
-                console.warn("[BuildTree] Input items array is null or undefined. Returning empty tree.");
-                return tree;
-            }
-            console.log(`[BuildTree] Received ${items.length} raw items from API to build tree.`);
-            let processedItemsCount = 0;
-
-            items.forEach(item => {
-                let effectivePath = item.path;
-                let shouldInclude = true;
-
-                if (AppConfig.PAGES_ROOT_IN_REPO) {
-                    if (item.path.startsWith(AppConfig.PAGES_ROOT_IN_REPO + '/')) {
-                        effectivePath = item.path.substring(AppConfig.PAGES_ROOT_IN_REPO.length + 1);
-                    } else if (item.path === AppConfig.PAGES_ROOT_IN_REPO) {
-                        // This is the root directory itself (e.g., 'docs' if PAGES_ROOT_IN_REPO is 'docs')
-                        // We don't want to list it as a separate item in the tree if it's the base.
-                        shouldInclude = false;
-                    } else { // Item is outside the PAGES_ROOT_IN_REPO
-                        shouldInclude = false;
+                _rawGitTree: [] // To store the fetched git tree items
+            },
+            computed: {
+                // You can add computed properties if needed
+            },
+            watch: {
+                '$route.hash': 'handleHashChange' // Watch for hash changes (requires Vue Router for full $route, or manual hash listening)
+            },
+            created() {
+                console.log("[VueApp] Vue instance created.");
+                this.initializeConfiguration();
+                this.initializeApp();
+                window.addEventListener('hashchange', this.handleHashChange);
+                this.handleHashChange(); // Initial load based on hash or default
+            },
+            beforeDestroy() {
+                window.removeEventListener('hashchange', this.handleHashChange);
+            },
+            methods: {
+                // --- 1. Configuration ---
+                initializeConfiguration() {
+                    console.log("[Config] Initializing configuration...");
+                    // Allow overriding config from a global object if needed for deployment
+                    if (window.AppConfig && typeof window.AppConfig === 'object') {
+                        this.config = { ...this.config, ...window.AppConfig };
+                        console.log("[Config] Overridden config with window.AppConfig:", this.config);
                     }
-                }
 
-                if (!shouldInclude || !effectivePath) { // Also skip if effectivePath becomes empty
-                    // console.log(`[BuildTree] Skipping item (path: '${item.path}') due to PAGES_ROOT_IN_REPO filter or empty effectivePath.`);
-                    return;
-                }
-                processedItemsCount++;
-
-                const parts = effectivePath.split('/');
-                let currentLevel = tree;
-                parts.forEach((part, index) => {
-                    if (!currentLevel[part]) {
-                        // Determine if it's a folder: if it's a 'tree' type from API, OR if it's not the last part of the path.
-                        const isDir = (item.type === 'tree' && index === parts.length -1) || (index < parts.length - 1);
-                        currentLevel[part] = { _type: isDir ? 'folder' : 'file', _children: {} };
+                    if (this.config.AUTO_INFER_CONFIG) {
+                        this.inferGitHubPagesConfig();
+                    } else {
+                        console.log("[Config] AUTO_INFER_CONFIG is false. Skipping automatic inference.");
                     }
-                    // If it's the last part, ensure type and path are correctly set for files
-                    if (index === parts.length - 1) {
-                        currentLevel[part]._type = (item.type === 'blob') ? 'file' : 'folder'; // 'tree' from API means folder
-                        if (item.type === 'blob') { // file
-                            currentLevel[part]._path = effectivePath;
+                    console.log(`[Config] Effective GitHub settings: Owner='${this.config.GITHUB_OWNER}', Repo='${this.config.GITHUB_REPO}', Branch='${this.config.GITHUB_BRANCH}', PagesRoot='${this.config.PAGES_ROOT_IN_REPO}'`);
+                },
+                inferGitHubPagesConfig() {
+                    console.log("[ConfigInfer] Starting config inference...");
+                    const hostname = window.location.hostname;
+                    const pathname = window.location.pathname;
+                    let inferredOwner = hostname.split('.')[0];
+                    let inferredRepo = null;
+
+                    if (hostname === `${inferredOwner}.github.io`) {
+                        const pathSegments = pathname.split('/').filter(Boolean);
+                        inferredRepo = pathSegments.length > 0 ? pathSegments[0] : `${inferredOwner}.github.io`;
+                    } else {
+                        console.warn(`[ConfigInfer] Hostname '${hostname}' is custom or non-standard. Manual GITHUB_OWNER/GITHUB_REPO in AppConfig recommended.`);
+                        // For custom domains, repo cannot be reliably inferred from URL. Owner might be from hostname.
+                    }
+
+                    if (this.config.GITHUB_OWNER === null) this.config.GITHUB_OWNER = inferredOwner;
+                    if (this.config.GITHUB_REPO === null && inferredRepo) this.config.GITHUB_REPO = inferredRepo;
+
+                    console.log(`[ConfigInfer] Post-inference: Owner='${this.config.GITHUB_OWNER}', Repo='${this.config.GITHUB_REPO}'`);
+                },
+
+                // --- 2. GitHub API & Directory Logic ---
+                async fetchGitHubTree() {
+                    this.isLoadingDirectory = true;
+                    this.directoryError = null;
+                    if (!this.config.GITHUB_OWNER || !this.config.GITHUB_REPO || !this.config.GITHUB_BRANCH) {
+                        const errorMsg = "<strong>配置错误:</strong> GitHub Owner, Repository, 或 Branch 未设置。";
+                        console.error("[API] fetchTree PRE-CHECK FAILED:", errorMsg);
+                        this.directoryError = errorMsg;
+                        this.isLoadingDirectory = false;
+                        return null;
+                    }
+                    const apiUrl = `${this.config.API_BASE_URL}/repos/${this.config.GITHUB_OWNER}/${this.config.GITHUB_REPO}/git/trees/${this.config.GITHUB_BRANCH}?recursive=1`;
+                    console.log(`[API] Fetching tree from: ${apiUrl}`);
+                    try {
+                        const response = await fetch(apiUrl, { headers: { "Accept": "application/vnd.github.v3+json" } });
+                        console.log(`[API] Fetch tree response status: ${response.status}`);
+                        if (!response.ok) {
+                            const errorData = await response.json().catch(() => ({ message: "无法解析错误响应" }));
+                            throw new Error(`GitHub API 错误: ${response.status} - ${errorData.message}`);
+                        }
+                        const data = await response.json();
+                        if (data.truncated) console.warn("[API] GitHub API 树信息被截断。");
+                        this._rawGitTree = data.tree || [];
+                        console.log(`[API] Fetched ${this._rawGitTree.length} items.`);
+                        return this._rawGitTree;
+                    } catch (error) {
+                        console.error('[API] 获取 GitHub 目录树失败:', error);
+                        this.directoryError = `获取目录树失败: ${error.message}<br>请检查控制台和网络连接。`;
+                        this.isLoadingDirectory = false;
+                        return null;
+                    }
+                },
+                buildTreeData(items) {
+                    const tree = {};
+                    if (!items) return tree;
+                    console.log(`[BuildTree] Building tree from ${items.length} raw items.`);
+                    let displayedItemCount = 0;
+
+                    items.forEach(item => {
+                        let effectivePath = item.path;
+                        let shouldInclude = true;
+
+                        if (this.config.PAGES_ROOT_IN_REPO) {
+                            if (item.path.startsWith(this.config.PAGES_ROOT_IN_REPO + '/')) {
+                                effectivePath = item.path.substring(this.config.PAGES_ROOT_IN_REPO.length + 1);
+                            } else if (item.path === this.config.PAGES_ROOT_IN_REPO) {
+                                shouldInclude = false; // Don't list the root dir itself
+                            } else {
+                                shouldInclude = false; // Outside pages root
+                            }
+                        }
+                        if (!shouldInclude || !effectivePath) return;
+                        displayedItemCount++;
+
+                        const parts = effectivePath.split('/');
+                        let currentLevel = tree;
+                        parts.forEach((part, index) => {
+                            if (!currentLevel[part]) {
+                                const isDir = (item.type === 'tree' && index === parts.length -1) || (index < parts.length - 1);
+                                currentLevel[part] = { _type: isDir ? 'folder' : 'file', _name: part, _children: {} };
+                            }
+                            if (index === parts.length - 1) {
+                                currentLevel[part]._type = (item.type === 'blob') ? 'file' : 'folder';
+                                if (item.type === 'blob') currentLevel[part]._path = effectivePath;
+                            }
+                            currentLevel = currentLevel[part]._children;
+                        });
+                    });
+                    console.log(`[BuildTree] Tree built. ${displayedItemCount} items included after filtering.`);
+                    if (displayedItemCount === 0 && items.length > 0) {
+                         this.directoryError = `目录中没有文件或文件夹。这可能是因为 <code>PAGES_ROOT_IN_REPO</code> ('${this.config.PAGES_ROOT_IN_REPO}') 设置不正确，或者该目录下确实为空。`;
+                    }
+                    return tree;
+                },
+                renderDirectoryTreeHtml(node) {
+                    let html = '<ul>';
+                    const sortedKeys = Object.keys(node).sort((a, b) => {
+                        const aIsDir = node[a]._type === 'folder';
+                        const bIsDir = node[b]._type === 'folder';
+                        if (aIsDir && !bIsDir) return -1;
+                        if (!aIsDir && bIsDir) return 1;
+                        return a.localeCompare(b);
+                    });
+
+                    for (const key of sortedKeys) {
+                        const item = node[key];
+                        html += '<li>';
+                        if (item._type === 'folder') {
+                            html += `<span class="folder">${item._name}</span>`;
+                            if (Object.keys(item._children).length > 0) {
+                                html += this.renderDirectoryTreeHtml(item._children);
+                            }
+                        } else if (item._type === 'file') {
+                            if (item._path && item._name.toLowerCase().endsWith('.md')) {
+                                html += `<a href="#${item._path}" class="file-md">${item._name}</a>`;
+                            } else {
+                                html += `<span class="file">${item._name}</span>`;
+                            }
+                        }
+                        html += '</li>';
+                    }
+                    html += '</ul>';
+                    return html;
+                },
+                async displayDirectory() {
+                    this.isLoadingDirectory = true;
+                    this.directoryError = null;
+                    const treeItems = await this.fetchGitHubTree();
+                    if (treeItems) {
+                        const directoryData = this.buildTreeData(treeItems);
+                        this.directoryTreeHtml = this.renderDirectoryTreeHtml(directoryData);
+                        if (!this.directoryTreeHtml && !this.directoryError) { // buildTreeData might set an error
+                            this.directoryTreeHtml = '<p>目录为空或无 Markdown 文件。</p>';
                         }
                     }
-                    currentLevel = currentLevel[part]._children;
-                });
-            });
-            console.log(`[BuildTree] Processed ${processedItemsCount} items after PAGES_ROOT_IN_REPO filtering. Tree structure built.`);
-            return tree;
-        }
-    </script>
+                    this.isLoadingDirectory = false;
+                },
 
-    <!-- 3. Directory Renderer -->
-    <script>
-        function renderTree(node, currentLevelPath = '') { // Changed currentPath to currentLevelPath for clarity
-            let html = '<ul>';
-            const sortedKeys = Object.keys(node).sort((a, b) => {
-                const aIsDir = node[a]._type === 'folder';
-                const bIsDir = node[b]._type === 'folder';
-                if (aIsDir && !bIsDir) return -1;
-                if (!aIsDir && bIsDir) return 1;
-                return a.localeCompare(b);
-            });
+                // --- 3. Markdown Rendering ---
+                async loadAndRenderMarkdown(path) {
+                    console.log(`[Markdown] Attempting to load: '${path}'`);
+                    this.renderedMarkdown = '正在加载...';
+                    this.contentError = null;
+                    document.title = `加载中 - ${path}`;
+                    this.currentMarkdownPath = path;
 
-            // console.log(`[RenderTree] Rendering level with keys: ${sortedKeys.join(', ')} at path: ${currentLevelPath}`);
-
-            for (const key of sortedKeys) {
-                const item = node[key];
-                html += '<li>';
-                if (item._type === 'folder') {
-                    html += `<span class="folder">${key}</span>`;
-                    if (Object.keys(item._children).length > 0) {
-                        // For folders, the path passed to children is built up from currentLevelPath and key
-                        const folderPath = currentLevelPath ? `${currentLevelPath}/${key}` : key;
-                        html += renderTree(item._children, folderPath);
+                    try {
+                        const response = await fetch(path); // path is relative to site root
+                        console.log(`[Markdown] Fetch status for '${path}': ${response.status}`);
+                        if (!response.ok) {
+                            if (path === this.config.DEFAULT_MARKDOWN_FILE && response.status === 404) {
+                                 throw new Error(`获取文件失败: ${response.status} ${response.statusText}。默认文件 <strong>${this.config.DEFAULT_MARKDOWN_FILE}</strong> 未找到，请在仓库中添加此文件。`);
+                            }
+                            throw new Error(`获取文件失败: ${response.status} ${response.statusText}`);
+                        }
+                        const markdownText = await response.text();
+                        this.renderedMarkdown = marked.parse(markdownText);
+                        document.title = path;
+                        console.log(`[Markdown] Successfully rendered: '${path}'`);
+                    } catch (error) {
+                        console.error(`[Markdown] Error loading '${path}':`, error);
+                        this.contentError = `加载 <strong>${path}</strong> 失败: ${error.message}`;
+                        this.renderedMarkdown = ''; // Clear content area on error
+                        document.title = `加载失败 - ${path}`;
                     }
-                } else if (item._type === 'file') {
-                    // Files should have _path directly from buildTree, which is relative to site root
-                    const filePath = item._path;
-                    if (!filePath) {
-                        console.error(`[RenderTree] File item '${key}' is missing _path property. This should not happen.`, item);
-                        html += `<span class="file" style="color:red;">${key} (Error: missing path)</span>`;
-                    } else if (key.toLowerCase().endsWith('.md')) {
-                        html += `<a href="#${filePath}" class="file-md">${key}</a>`;
+                },
+
+                // --- 4. Application Logic & Event Handling ---
+                handleHashChange() {
+                    console.log("[AppLogic] Hash changed or initial load. Current hash:", window.location.hash);
+                    let pathFromHash = window.location.hash.substring(1);
+
+                    if (!pathFromHash) {
+                        console.log("[AppLogic] No path in hash, using default:", this.config.DEFAULT_MARKDOWN_FILE);
+                        pathFromHash = this.config.DEFAULT_MARKDOWN_FILE;
+                        // Optionally, update hash to reflect the default, but be careful of loops
+                        // window.history.replaceState(null, null, '#' + pathFromHash);
+                    }
+                    
+                    // Only load if the path is different from the current one, or if current is empty (initial load)
+                    if (pathFromHash && pathFromHash !== this.currentMarkdownPath) {
+                        this.loadAndRenderMarkdown(pathFromHash);
+                    } else if (!pathFromHash && !this.currentMarkdownPath) { // Initial load, no hash, default file
+                         this.loadAndRenderMarkdown(this.config.DEFAULT_MARKDOWN_FILE);
                     } else {
-                        html += `<span class="file">${key}</span>`;
+                        console.log("[AppLogic] Path from hash is same as current or empty, no new load triggered for:", pathFromHash);
                     }
-                }
-                html += '</li>';
-            }
-            html += '</ul>';
-            return html;
-        }
-
-        async function displayDirectoryTree() {
-            console.log("[DirDisplay] Attempting to display directory tree...");
-            const directoryElement = document.getElementById(AppConfig.SIDEBAR_TREE_ID);
-            if (!directoryElement) {
-                console.error(`[DirDisplay] CRITICAL: Directory container element '#${AppConfig.SIDEBAR_TREE_ID}' not found in DOM!`);
-                return;
-            }
-            directoryElement.innerHTML = '正在加载目录...';
-            const treeItems = await fetchGitHubTree();
-            if (treeItems) {
-                const directoryData = buildTree(treeItems);
-                if (Object.keys(directoryData).length === 0 && treeItems.length > 0) {
-                    console.warn("[DirDisplay] Tree data is empty after buildTree, but API returned items. Check PAGES_ROOT_IN_REPO and filtering logic.");
-                     directoryElement.innerHTML = `<p>目录为空，或所有文件均在 <code>${AppConfig.PAGES_ROOT_IN_REPO || '仓库根'}</code> 目录之外。</p><p>请检查 <code>AppConfig.PAGES_ROOT_IN_REPO</code> 配置。</p>`;
-                } else if (Object.keys(directoryData).length === 0 && treeItems.length === 0) {
-                    directoryElement.innerHTML = '<p>仓库目录为空。</p>';
-                }
-                else {
-                    const treeHtml = renderTree(directoryData);
-                    directoryElement.innerHTML = treeHtml || '<p>目录为空或未找到 Markdown 文件。</p>'; // Fallback if renderTree returns empty
-                    console.log("[DirDisplay] Directory tree rendered.");
-                }
-            } else {
-                 console.log("[DirDisplay] fetchGitHubTree returned no items. Directory display aborted or error message shown by fetchGitHubTree.");
-            }
-        }
-    </script>
-
-    <!-- 4. Markdown Renderer -->
-    <script>
-        async function loadMarkdown(filename) {
-            const contentDiv = document.getElementById(AppConfig.MAIN_CONTENT_ID);
-            if (!contentDiv) {
-                console.error(`[MarkdownLoad] CRITICAL: Content container element '#${AppConfig.MAIN_CONTENT_ID}' not found in DOM!`);
-                return;
-            }
-            console.log(`[MarkdownLoad] Attempting to load Markdown: '${filename}'`);
-            contentDiv.innerHTML = '正在加载...';
-            document.title = `加载中 - ${filename}`;
-
-            try {
-                // filename is expected to be relative to the GitHub Pages site root
-                const response = await fetch(filename);
-                console.log(`[MarkdownLoad] Fetch response status for '${filename}': ${response.status}`);
-                if (!response.ok) {
-                    throw new Error(`获取文件失败: ${response.status} ${response.statusText} (文件: ${filename})`);
-                }
-                const markdownText = await response.text();
-                const htmlContent = marked.parse(markdownText);
-                contentDiv.innerHTML = htmlContent;
-                document.title = filename;
-                console.log(`[MarkdownLoad] Successfully loaded and rendered: '${filename}'`);
-            } catch (error) {
-                console.error(`[MarkdownLoad] Error loading Markdown file '${filename}':`, error);
-                contentDiv.innerHTML = `<p style="color:red;">加载 <strong>${filename}</strong> 失败。</p><p>${error.message}</p><p>请确保文件存在并且路径相对于网站根目录是正确的。</p>`;
-                document.title = `加载失败 - ${filename}`;
-            }
-        }
-    </script>
-
-    <!-- 5. Main Application Logic -->
-    <script>
-        function checkHashAndLoad() {
-            console.log("[AppLogic] checkHashAndLoad triggered.");
-            let filename = window.location.hash.substring(1);
-            console.log(`[AppLogic] Current hash: '${window.location.hash}', Parsed filename from hash: '${filename}'`);
-
-            if (!filename) {
-                console.log("[AppLogic] No filename in hash. Attempting to find default Markdown file.");
-                const firstMdLink = document.querySelector(`#${AppConfig.SIDEBAR_TREE_ID} a.file-md`);
-                if (firstMdLink) {
-                    filename = firstMdLink.getAttribute('href').substring(1);
-                    console.log(`[AppLogic] Found first Markdown file in directory: '${filename}'. Updating hash.`);
-                    window.location.hash = '#' + filename; // This will re-trigger hashchange, leading to load.
-                    return; // Let the new hashchange event handle the loading.
-                } else {
-                    filename = AppConfig.DEFAULT_MARKDOWN_FILE;
-                    console.log(`[AppLogic] No Markdown files in directory or default '${AppConfig.DEFAULT_MARKDOWN_FILE}' will be used: '${filename}'`);
+                },
+                async initializeApp() {
+                    console.log("[AppInit] Initializing application...");
+                    if (!this.config.GITHUB_OWNER || !this.config.GITHUB_REPO) {
+                        this.directoryError = "<strong>致命配置错误:</strong> GITHUB_OWNER 或 GITHUB_REPO 未设置。请检查 <code>AppConfig</code> 或自动推断逻辑。";
+                        this.isLoadingDirectory = false;
+                        console.error("[AppInit] CRITICAL CONFIG ERROR:", this.directoryError);
+                        return;
+                    }
+                    await this.displayDirectory();
+                    // Initial content load is now handled by created() calling handleHashChange()
+                    console.log("[AppInit] Application initialized.");
                 }
             }
-
-            if (filename) {
-                console.log(`[AppLogic] Determined filename to load: '${filename}'`);
-                loadMarkdown(filename);
-            } else {
-                 console.warn("[AppLogic] No filename could be determined to load.");
-                 const contentDiv = document.getElementById(AppConfig.MAIN_CONTENT_ID);
-                 if (contentDiv) {
-                    contentDiv.innerHTML = `<p>请从目录中选择一个文件，或确保默认文件 (<code>${AppConfig.DEFAULT_MARKDOWN_FILE}</code>) 存在。</p>`;
-                 }
-                 document.title = "请选择文件";
-            }
-        }
-
-        async function initializeApp() {
-            console.log("[AppInit] Initializing application...");
-            if (AppConfig.AUTO_INFER_CONFIG) {
-                inferGitHubPagesConfig();
-            } else {
-                console.log("[AppInit] AUTO_INFER_CONFIG is false. Skipping automatic configuration inference.");
-                console.log(`[AppInit] Using manually set AppConfig values: Owner='${AppConfig.GITHUB_OWNER}', Repo='${AppConfig.GITHUB_REPO}', Branch='${AppConfig.GITHUB_BRANCH}', PagesRoot='${AppConfig.PAGES_ROOT_IN_REPO}'`);
-            }
-
-            console.log(`[AppInit] Final GitHub Config for API calls: Owner='${AppConfig.GITHUB_OWNER}', Repo='${AppConfig.GITHUB_REPO}', Branch='${AppConfig.GITHUB_BRANCH}'`);
-
-            if (!AppConfig.GITHUB_OWNER || !AppConfig.GITHUB_REPO) {
-                console.error("[AppInit] CRITICAL CONFIGURATION ERROR: GITHUB_OWNER or GITHUB_REPO is not set or is invalid.");
-                console.error(`[AppInit] Current values: Owner='${AppConfig.GITHUB_OWNER}', Repo='${AppConfig.GITHUB_REPO}'`);
-                const errorMsg = `<p style="color:red;"><strong>配置错误:</strong> GitHub Owner 或 Repository 未正确设置。</p>
-                                  <p>请检查控制台日志。如果 <code>AUTO_INFER_CONFIG</code> 为 true，确保 URL 结构可被正确解析。
-                                  否则，请在 <code>AppConfig</code> 中手动设置 <code>GITHUB_OWNER</code> 和 <code>GITHUB_REPO</code>。</p>`;
-                const sidebarDiv = document.getElementById(AppConfig.SIDEBAR_TREE_ID);
-                const contentDiv = document.getElementById(AppConfig.MAIN_CONTENT_ID);
-                if (sidebarDiv) sidebarDiv.innerHTML = errorMsg;
-                if (contentDiv) contentDiv.innerHTML = "";
-                return; // Stop further initialization
-            }
-
-            await displayDirectoryTree();
-            checkHashAndLoad();
-            console.log("[AppInit] Application initialized successfully.");
-        }
-
-        window.addEventListener('DOMContentLoaded', () => {
-            console.log("[DOM] DOMContentLoaded event fired.");
-            initializeApp();
         });
-        window.addEventListener('hashchange', () => {
-            console.log("[Hash] hashchange event fired.");
-            checkHashAndLoad();
-        });
-    </script>
 
+        // Optional: For overriding Vue AppConfig easily from another script or HTML
+        // window.AppConfig = {
+        //     GITHUB_OWNER: "your_username",
+        //     GITHUB_REPO: "your_repo_name",
+        //     GITHUB_BRANCH: "main", // or "gh-pages"
+        //     PAGES_ROOT_IN_REPO: "" // or "docs"
+        // };
+    </script>
 </body>
 </html>
