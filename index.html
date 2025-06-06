@@ -20,7 +20,8 @@
             min-height: 100vh;
         }
 
-        #app { /* Vue app root */
+        #app {
+            /* Vue app root */
             display: flex;
             width: 100%;
             height: 100vh;
@@ -44,27 +45,37 @@
             color: #8b949e;
             border-bottom: 1px solid #30363d;
             padding-bottom: 10px;
-            flex-shrink: 0; /* Prevent h3 from shrinking */
+            flex-shrink: 0;
+            /* Prevent h3 from shrinking */
         }
 
-        #directory-error-display, #content-error-display {
-            background-color: #2c0b0b; /* Dark red background for errors */
-            color: #ff8383; /* Light red text for errors */
+        #directory-error-display,
+        #content-error-display {
+            background-color: #2c0b0b;
+            /* Dark red background for errors */
+            color: #ff8383;
+            /* Light red text for errors */
             padding: 10px;
             margin-bottom: 10px;
             border: 1px solid #581e1e;
             border-radius: 4px;
             font-size: 0.9em;
-            white-space: pre-wrap; /* Preserve line breaks in error messages */
-            flex-shrink: 0; /* Prevent error display from shrinking */
+            white-space: pre-wrap;
+            /* Preserve line breaks in error messages */
+            flex-shrink: 0;
+            /* Prevent error display from shrinking */
         }
-        #directory-error-display:empty, #content-error-display:empty {
-            display: none; /* Hide if no error */
+
+        #directory-error-display:empty,
+        #content-error-display:empty {
+            display: none;
+            /* Hide if no error */
         }
 
 
         #directory-tree-container {
-            flex-grow: 1; /* Allow tree to take remaining space and scroll */
+            flex-grow: 1;
+            /* Allow tree to take remaining space and scroll */
             overflow-y: auto;
         }
 
@@ -82,13 +93,16 @@
             text-decoration: none;
             cursor: pointer;
         }
+
         #directory-tree a:hover {
             text-decoration: underline;
         }
+
         .folder {
             font-weight: bold;
             color: #c9d1d9;
         }
+
         .file {
             color: #8b949e;
         }
@@ -99,16 +113,21 @@
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
-            padding: 20px; /* Add padding here instead of markdown-body for error display positioning */
+            padding: 20px;
+            /* Add padding here instead of markdown-body for error display positioning */
         }
 
         .markdown-body {
             box-sizing: border-box;
             min-width: 200px;
             max-width: 980px;
-            margin: 0 auto; /* Center markdown content */
-            padding: 25px; /* Original padding for markdown content itself */
-            flex-grow: 1; /* Allow markdown body to take space */
+            width: 100%;
+            margin: 0 auto;
+            /* Center markdown content */
+            padding: 25px;
+            /* Original padding for markdown content itself */
+            flex-grow: 1;
+            /* Allow markdown body to take space */
         }
 
 
@@ -116,6 +135,7 @@
             #app {
                 flex-direction: column;
             }
+
             #sidebar {
                 width: 100%;
                 max-width: none;
@@ -124,11 +144,13 @@
                 border-right: none;
                 border-bottom: 1px solid #30363d;
             }
+
             #main-content {
                 height: auto;
                 padding: 15px;
             }
-             .markdown-body {
+
+            .markdown-body {
                 padding: 15px;
             }
         }
@@ -291,7 +313,7 @@
                         let currentLevel = tree;
                         parts.forEach((part, index) => {
                             if (!currentLevel[part]) {
-                                const isDir = (item.type === 'tree' && index === parts.length -1) || (index < parts.length - 1);
+                                const isDir = (item.type === 'tree' && index === parts.length - 1) || (index < parts.length - 1);
                                 currentLevel[part] = { _type: isDir ? 'folder' : 'file', _name: part, _children: {} };
                             }
                             if (index === parts.length - 1) {
@@ -303,7 +325,7 @@
                     });
                     console.log(`[BuildTree] Tree built. ${displayedItemCount} items included after filtering.`);
                     if (displayedItemCount === 0 && items.length > 0) {
-                         this.directoryError = `目录中没有文件或文件夹。这可能是因为 <code>PAGES_ROOT_IN_REPO</code> ('${this.config.PAGES_ROOT_IN_REPO}') 设置不正确，或者该目录下确实为空。`;
+                        this.directoryError = `目录中没有文件或文件夹。这可能是因为 <code>PAGES_ROOT_IN_REPO</code> ('${this.config.PAGES_ROOT_IN_REPO}') 设置不正确，或者该目录下确实为空。`;
                     }
                     return tree;
                 },
@@ -364,7 +386,7 @@
                         console.log(`[Markdown] Fetch status for '${path}': ${response.status}`);
                         if (!response.ok) {
                             if (path === this.config.DEFAULT_MARKDOWN_FILE && response.status === 404) {
-                                 throw new Error(`获取文件失败: ${response.status} ${response.statusText}。默认文件 <strong>${this.config.DEFAULT_MARKDOWN_FILE}</strong> 未找到，请在仓库中添加此文件。`);
+                                throw new Error(`获取文件失败: ${response.status} ${response.statusText}。默认文件 <strong>${this.config.DEFAULT_MARKDOWN_FILE}</strong> 未找到，请在仓库中添加此文件。`);
                             }
                             throw new Error(`获取文件失败: ${response.status} ${response.statusText}`);
                         }
@@ -391,12 +413,12 @@
                         // Optionally, update hash to reflect the default, but be careful of loops
                         // window.history.replaceState(null, null, '#' + pathFromHash);
                     }
-                    
+
                     // Only load if the path is different from the current one, or if current is empty (initial load)
                     if (pathFromHash && pathFromHash !== this.currentMarkdownPath) {
                         this.loadAndRenderMarkdown(pathFromHash);
                     } else if (!pathFromHash && !this.currentMarkdownPath) { // Initial load, no hash, default file
-                         this.loadAndRenderMarkdown(this.config.DEFAULT_MARKDOWN_FILE);
+                        this.loadAndRenderMarkdown(this.config.DEFAULT_MARKDOWN_FILE);
                     } else {
                         console.log("[AppLogic] Path from hash is same as current or empty, no new load triggered for:", pathFromHash);
                     }
@@ -425,4 +447,5 @@
         // };
     </script>
 </body>
+
 </html>
