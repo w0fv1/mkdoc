@@ -1,6 +1,6 @@
 # MKDOC - Simple Vue Markdown Viewer
 
-[中文版 (Chinese Version)](README.md)
+[中文版 (Chinese Version)](#README.md)
 
 MKDOC is a single-page application built with Vue.js 2, designed to view Markdown files hosted in a GitHub repository directly in the browser. It automatically fetches the directory structure from the specified GitHub repository and renders Markdown content using `marked.js`, providing a GitHub Pages-like documentation browsing experience.
 
