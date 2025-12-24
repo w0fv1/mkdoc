@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vue Markdown 查看器</title>
+    <title>Vue Markdown Viewer</title>
     <link rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.8.1/github-markdown-dark.min.css" />
     <script src="https://unpkg.com/vue@2.7.16/dist/vue.js"></script>
@@ -223,20 +223,20 @@
 <body>
     <div id="app">
         <div id="sidebar">
-            <h3>文件目录</h3>
+            <h3>File Directory</h3>
             <div id="directory-actions">
-                <button @click="refreshDirectory" :disabled="isLoadingDirectory">手动拉取</button>
-                <button @click="clearDirectoryCache" :disabled="isLoadingDirectory">清除缓存</button>
+                <button @click="refreshDirectory" :disabled="isLoadingDirectory">Refresh Directory</button>
+                <button @click="clearDirectoryCache" :disabled="isLoadingDirectory">Clear Cache</button>
             </div>
             <div id="directory-cache-info" v-if="directoryCacheInfo">{{ directoryCacheInfo }}</div>
             <div id="directory-notice-display" v-if="directoryNotice" v-html="directoryNotice"></div>
             <div id="directory-treefile-hint" v-if="treeFileHint">
                 <div v-html="treeFileHint"></div>
-                <button @click="copyTreeFileContent" :disabled="!treeFileCopyPayload">复制目录树文件内容</button>
+                <button @click="copyTreeFileContent" :disabled="!treeFileCopyPayload">Copy directory tree file content</button>
             </div>
             <div id="directory-error-display" v-if="directoryError" v-html="directoryError"></div>
             <div id="directory-tree-container">
-                <div v-if="isLoadingDirectory">正在加载目录...</div>
+                <div v-if="isLoadingDirectory">Loading directory...</div>
                 <div v-html="directoryTreeHtml" id="directory-tree"></div>
             </div>
         </div>
@@ -274,7 +274,7 @@
                 treeFileCopyPayload: '',
 
                 currentMarkdownPath: '',
-                renderedMarkdown: '正在加载...',
+                renderedMarkdown: 'Loading...',
                 contentError: null, // For errors related to fetching/rendering markdown
 
                 _rawGitTree: [] // To store the fetched git tree items
@@ -399,27 +399,27 @@
                         const response = await fetch(treeFilePath, { cache: "no-store" });
                         if (response.status === 404) return null;
                         if (!response.ok) {
-                            throw new Error(`目录树文件请求失败: ${response.status} ${response.statusText}`);
+                        throw new Error(`Directory tree file request failed: ${response.status} ${response.statusText}`);
                         }
                         const text = await response.text();
                         const payload = JSON.parse(text);
                         const items = this.extractTreeItemsFromFile(payload);
                         if (!items || items.length === 0) {
-                            throw new Error("目录树文件内容为空或格式不正确");
+                            throw new Error("Directory tree file content is empty or invalid");
                         }
                         return { items, payload };
                     } catch (error) {
                         console.warn("[TreeFile] Failed to load tree file:", error);
-                        this.directoryNotice = `目录树文件读取失败，已回退到 GitHub API。<br>${error.message}`;
+                        this.directoryNotice = `Failed to read the directory tree file, falling back to the GitHub API.<br>${error.message}`;
                         return null;
                     }
                 },
                 setTreeFileHintFromGitHub(items) {
                     const rootHint = this.config.PAGES_ROOT_IN_REPO || '.';
                     const treeFilePath = this.getTreeFilePath() || 'mkdoc.tree.json';
-                    this.treeFileHint = `未发现目录树文件 <code>${treeFilePath}</code>。建议在仓库中生成并提交该文件以避免 API 限流。<br>` +
-                        `可运行：<code>node scripts/mkdoc-generate-tree.mjs --root ${rootHint} --out ${treeFilePath}</code><br>` +
-                        `或点击下方按钮复制目录树文件内容后自行新建并提交。`;
+                    this.treeFileHint = `Directory tree file <code>${treeFilePath}</code> not found. Generate and commit this file in your repository to avoid API rate limits.<br>` +
+                        `You can run: <code>node scripts/mkdoc-generate-tree.mjs --root ${rootHint} --out ${treeFilePath}</code><br>` +
+                        `Or click the button below to copy the tree file contents, then create and commit the file manually.`;
                     const payload = this.createTreeFilePayload(items, this.config.PAGES_ROOT_IN_REPO || '');
                     this.treeFileCopyPayload = JSON.stringify(payload, null, 2);
                 },
@@ -427,9 +427,9 @@
                     if (!this.treeFileCopyPayload) return;
                     const ok = await this.copyTextToClipboard(this.treeFileCopyPayload);
                     if (ok) {
-                        this.directoryNotice = "目录树文件内容已复制到剪贴板，可新建文件并提交到仓库。";
+                        this.directoryNotice = "Directory tree file content copied to the clipboard; you can create the file and commit it to your repository.";
                     } else {
-                        this.directoryNotice = "复制失败，请手动复制目录树文件内容。";
+                        this.directoryNotice = "Copy failed; please copy the directory tree file content manually.";
                     }
                 },
                 async copyTextToClipboard(text) {
@@ -474,14 +474,14 @@
                 },
                 formatCacheInfo(fetchedAt) {
                     const date = new Date(fetchedAt);
-                    return `缓存时间: ${date.toLocaleString()}`;
+                    return `Cache timestamp: ${date.toLocaleString()}`;
                 },
                 async fetchGitHubTree(forceRefresh = false) {
                     this.isLoadingDirectory = true;
                     this.directoryError = null;
                     this.directoryNotice = '';
                     if (!this.config.GITHUB_OWNER || !this.config.GITHUB_REPO || !this.config.GITHUB_BRANCH) {
-                        const errorMsg = "<strong>配置错误:</strong> GitHub Owner, Repository, 或 Branch 未设置。";
+                        const errorMsg = "<strong>Configuration error:</strong> GitHub Owner, Repository, or Branch is not set.";
                         console.error("[API] fetchTree PRE-CHECK FAILED:", errorMsg);
                         this.directoryError = errorMsg;
                         this.isLoadingDirectory = false;
@@ -516,8 +516,8 @@
                             return this._rawGitTree;
                         }
                         if (!response.ok) {
-                            const errorData = await response.json().catch(() => ({ message: "无法解析错误响应" }));
-                            const message = (errorData && errorData.message) ? String(errorData.message) : "未知错误";
+                            const errorData = await response.json().catch(() => ({ message: "Unable to parse error response" }));
+                            const message = (errorData && errorData.message) ? String(errorData.message) : "Unknown error";
                             const isRateLimit = response.status === 403 && message.toLowerCase().includes("rate limit exceeded");
                             if (isRateLimit) {
                                 const reset = response.headers.get("X-RateLimit-Reset");
@@ -527,19 +527,19 @@
 
                                 if (cachedAny && cachedAny.tree) {
                                     console.warn("[API] Rate limit exceeded; falling back to cached tree.");
-                                    this.directoryNotice = `GitHub API 达到速率限制${resetText ? `（预计 ${resetText} 重置）` : ''}，已使用本地缓存目录。`;
+                                    this.directoryNotice = `GitHub API rate limit reached${resetText ? ` (resets around ${resetText})` : ''}; using the local cache.`;
                                     this._rawGitTree = cachedAny.tree || [];
                                     this.directoryCacheInfo = this.formatCacheInfo(cachedAny.fetchedAt);
                                     return this._rawGitTree;
                                 }
-                                throw new Error(`GitHub API 速率限制已用尽${resetText ? `（预计 ${resetText} 重置）` : ''}。请稍后再试，或减少刷新频率。`);
+                                throw new Error(`GitHub API rate limit exceeded${resetText ? ` (resets around ${resetText})` : ''}. Please try again later or refresh less frequently.`);
                             }
-                            throw new Error(`GitHub API 错误: ${response.status} - ${message}`);
+                            throw new Error(`GitHub API error: ${response.status} - ${message}`);
                         }
                         const data = await response.json();
                         if (data.truncated) {
-                            console.warn("[API] GitHub API 树信息被截断。");
-                            this.directoryNotice = "注意: 仓库目录树被 GitHub 截断，可能无法显示完整文件列表。";
+                            console.warn("[API] GitHub API tree data truncated.");
+                            this.directoryNotice = "Note: GitHub truncated the repository tree, so some files may not appear.";
                         }
                         this._rawGitTree = data.tree || [];
                         const etag = response.headers.get("ETag");
@@ -548,8 +548,8 @@
                         console.log(`[API] Fetched ${this._rawGitTree.length} items.`);
                         return this._rawGitTree;
                     } catch (error) {
-                        console.error('[API] 获取 GitHub 目录树失败:', error);
-                        this.directoryError = `获取目录树失败: ${error.message}<br>请检查控制台和网络连接。`;
+                        console.error('[API] Failed to fetch GitHub tree:', error);
+                        this.directoryError = `Failed to fetch the directory tree: ${error.message}<br>Please check the console and network connection.`;
                         this.isLoadingDirectory = false;
                         return null;
                     }
@@ -592,7 +592,7 @@
                     });
                     console.log(`[BuildTree] Tree built. ${displayedItemCount} items included after filtering.`);
                     if (displayedItemCount === 0 && items.length > 0) {
-                        this.directoryError = `目录中没有文件或文件夹。这可能是因为 <code>PAGES_ROOT_IN_REPO</code> ('${this.config.PAGES_ROOT_IN_REPO}') 设置不正确，或者该目录下确实为空。`;
+                        this.directoryError = `No files or folders were found in the directory. This might be because <code>PAGES_ROOT_IN_REPO</code> ('${this.config.PAGES_ROOT_IN_REPO}') is set incorrectly, or because the directory is actually empty.`;
                     }
                     return tree;
                 },
@@ -640,11 +640,11 @@
                     }
                     const treeFileResult = await this.fetchTreeFile();
                     if (treeFileResult && treeFileResult.items) {
-                        this.directoryNotice = `目录树来源: 目录树文件 <code>${this.getTreeFilePath()}</code>`;
+                        this.directoryNotice = `Directory tree source: directory tree file <code>${this.getTreeFilePath()}</code>`;
                         const directoryData = this.buildTreeData(treeFileResult.items);
                         this.directoryTreeHtml = this.renderDirectoryTreeHtml(directoryData);
                         if (!this.directoryTreeHtml && !this.directoryError) {
-                            this.directoryTreeHtml = '<p>目录为空或无 Markdown 文件。</p>';
+                            this.directoryTreeHtml = '<p>The directory is empty or contains no Markdown files.</p>';
                         }
                         this.isLoadingDirectory = false;
                         return;
@@ -653,14 +653,14 @@
                     const treeItems = await this.fetchGitHubTree(forceRefresh);
                     if (treeItems) {
                         if (this.directoryNotice) {
-                            this.directoryNotice += "<br>目录树来源: GitHub API";
+                            this.directoryNotice += "<br>Directory tree source: GitHub API";
                         } else {
-                            this.directoryNotice = "目录树来源: GitHub API";
+                            this.directoryNotice = "Directory tree source: GitHub API";
                         }
                         const directoryData = this.buildTreeData(treeItems);
                         this.directoryTreeHtml = this.renderDirectoryTreeHtml(directoryData);
                         if (!this.directoryTreeHtml && !this.directoryError) {
-                            this.directoryTreeHtml = '<p>目录为空或无 Markdown 文件。</p>';
+                            this.directoryTreeHtml = '<p>The directory is empty or contains no Markdown files.</p>';
                         }
                         this.setTreeFileHintFromGitHub(treeItems);
                         this.isLoadingDirectory = false;
@@ -669,32 +669,32 @@
 
                     const cachedAny = this.readCachedTree();
                     if (cachedAny && cachedAny.tree) {
-                        this.directoryNotice = "GitHub API 不可用，已回退到本地缓存目录。";
+                        this.directoryNotice = "GitHub API unavailable; falling back to the local cached directory.";
                         this.directoryCacheInfo = this.formatCacheInfo(cachedAny.fetchedAt);
                         const directoryData = this.buildTreeData(cachedAny.tree || []);
                         this.directoryTreeHtml = this.renderDirectoryTreeHtml(directoryData);
                         if (!this.directoryTreeHtml && !this.directoryError) {
-                            this.directoryTreeHtml = '<p>目录为空或无 Markdown 文件。</p>';
+                            this.directoryTreeHtml = '<p>The directory is empty or contains no Markdown files.</p>';
                         }
                     }
                     this.isLoadingDirectory = false;
                 },
                 async refreshDirectory() {
-                    this.directoryCacheInfo = '正在手动拉取...';
-                    await this.displayDirectory(true);
-                },
-                clearDirectoryCache() {
-                    this.clearCachedTree();
-                    this.directoryCacheInfo = '缓存已清除';
+                    this.directoryCacheInfo = 'Refreshing directory...';
+                await this.displayDirectory(true);
+            },
+            clearDirectoryCache() {
+                this.clearCachedTree();
+                this.directoryCacheInfo = 'Cache cleared';
                     this.directoryNotice = '';
                 },
 
                 // --- 3. Markdown Rendering ---
                 async loadAndRenderMarkdown(path) {
                     console.log(`[Markdown] Attempting to load: '${path}'`);
-                    this.renderedMarkdown = '正在加载...';
+                    this.renderedMarkdown = 'Loading...';
                     this.contentError = null;
-                    document.title = `加载中 - ${path}`;
+                    document.title = `Loading - ${path}`;
                     this.currentMarkdownPath = path;
 
                     try {
@@ -702,9 +702,9 @@
                         console.log(`[Markdown] Fetch status for '${path}': ${response.status}`);
                         if (!response.ok) {
                             if (path === this.config.DEFAULT_MARKDOWN_FILE && response.status === 404) {
-                                throw new Error(`获取文件失败: ${response.status} ${response.statusText}。默认文件 <strong>${this.config.DEFAULT_MARKDOWN_FILE}</strong> 未找到，请在仓库中添加此文件。`);
+                                throw new Error(`Failed to fetch the file: ${response.status} ${response.statusText}. The default file <strong>${this.config.DEFAULT_MARKDOWN_FILE}</strong> was not found; please add it to the repository.`);
                             }
-                            throw new Error(`获取文件失败: ${response.status} ${response.statusText}`);
+                            throw new Error(`Failed to fetch the file: ${response.status} ${response.statusText}`);
                         }
                         const markdownText = await response.text();
                         const unsafeHtml = marked.parse(markdownText);
@@ -712,15 +712,15 @@
                             this.renderedMarkdown = DOMPurify.sanitize(unsafeHtml);
                         } else {
                             this.renderedMarkdown = unsafeHtml;
-                            this.contentError = "安全提示: DOMPurify 未加载，已渲染未经清洗的 HTML。";
+                            this.contentError = "Security warning: DOMPurify did not load, so raw HTML is being rendered.";
                         }
                         document.title = path;
                         console.log(`[Markdown] Successfully rendered: '${path}'`);
                     } catch (error) {
                         console.error(`[Markdown] Error loading '${path}':`, error);
-                        this.contentError = `加载 <strong>${path}</strong> 失败: ${error.message}`;
+                        this.contentError = `Loading <strong>${path}</strong> failed: ${error.message}`;
                         this.renderedMarkdown = ''; // Clear content area on error
-                        document.title = `加载失败 - ${path}`;
+                        document.title = `Load failed - ${path}`;
                     }
                 },
 
@@ -748,7 +748,7 @@
                 async initializeApp() {
                     console.log("[AppInit] Initializing application...");
                     if (!this.config.GITHUB_OWNER || !this.config.GITHUB_REPO) {
-                        this.directoryError = "<strong>致命配置错误:</strong> GITHUB_OWNER 或 GITHUB_REPO 未设置。请检查 <code>AppConfig</code> 或自动推断逻辑。";
+                        this.directoryError = "<strong>Critical configuration error:</strong> GITHUB_OWNER or GITHUB_REPO is not set. Please check <code>AppConfig</code> or the inference logic.";
                         this.isLoadingDirectory = false;
                         console.error("[AppInit] CRITICAL CONFIG ERROR:", this.directoryError);
                         return;
