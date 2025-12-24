@@ -9,6 +9,7 @@
         href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.8.1/github-markdown-dark.min.css" />
     <script src="https://unpkg.com/vue@2.7.16/dist/vue.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.2.12/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.8/purify.min.js"></script>
 
     <style>
         body {
@@ -72,11 +73,57 @@
             /* Hide if no error */
         }
 
+        #directory-notice-display {
+            background-color: #0d1f2b;
+            color: #8ec7ff;
+            padding: 8px 10px;
+            margin-bottom: 10px;
+            border: 1px solid #1b3a55;
+            border-radius: 4px;
+            font-size: 0.9em;
+            white-space: pre-wrap;
+            flex-shrink: 0;
+        }
+
+        #directory-notice-display:empty {
+            display: none;
+        }
 
         #directory-tree-container {
             flex-grow: 1;
             /* Allow tree to take remaining space and scroll */
             overflow-y: auto;
+        }
+
+        #directory-actions {
+            display: flex;
+            gap: 8px;
+            margin: 10px 0 12px;
+        }
+
+        #directory-actions button {
+            background-color: #21262d;
+            color: #c9d1d9;
+            border: 1px solid #30363d;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        #directory-actions button:hover {
+            background-color: #2d333b;
+        }
+
+        #directory-actions button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        #directory-cache-info {
+            color: #8b949e;
+            font-size: 12px;
+            margin-bottom: 8px;
         }
 
         #directory-tree ul {
@@ -161,6 +208,12 @@
     <div id="app">
         <div id="sidebar">
             <h3>文件目录</h3>
+            <div id="directory-actions">
+                <button @click="refreshDirectory" :disabled="isLoadingDirectory">手动拉取</button>
+                <button @click="clearDirectoryCache" :disabled="isLoadingDirectory">清除缓存</button>
+            </div>
+            <div id="directory-cache-info" v-if="directoryCacheInfo">{{ directoryCacheInfo }}</div>
+            <div id="directory-notice-display" v-if="directoryNotice" v-html="directoryNotice"></div>
             <div id="directory-error-display" v-if="directoryError" v-html="directoryError"></div>
             <div id="directory-tree-container">
                 <div v-if="isLoadingDirectory">正在加载目录...</div>
@@ -189,11 +242,14 @@
                     PAGES_ROOT_IN_REPO: '',
                     DEFAULT_MARKDOWN_FILE: 'README.md',
                     API_BASE_URL: 'https://api.github.com',
+                    TREE_CACHE_TTL_MS: 1000 * 60 * 60 * 6,
                     // GITHUB_TOKEN: null,
                 },
                 isLoadingDirectory: true,
                 directoryTreeHtml: '',
                 directoryError: null, // For errors related to fetching/building directory
+                directoryCacheInfo: '',
+                directoryNotice: '',
 
                 currentMarkdownPath: '',
                 renderedMarkdown: '正在加载...',
@@ -204,9 +260,7 @@
             computed: {
                 // You can add computed properties if needed
             },
-            watch: {
-                '$route.hash': 'handleHashChange' // Watch for hash changes (requires Vue Router for full $route, or manual hash listening)
-            },
+            watch: {},
             created() {
                 console.log("[VueApp] Vue instance created.");
                 this.initializeConfiguration();
@@ -256,9 +310,57 @@
                 },
 
                 // --- 2. GitHub API & Directory Logic ---
-                async fetchGitHubTree() {
+                getCacheKey() {
+                    const parts = [
+                        this.config.GITHUB_OWNER,
+                        this.config.GITHUB_REPO,
+                        this.config.GITHUB_BRANCH,
+                        this.config.PAGES_ROOT_IN_REPO || ''
+                    ];
+                    return `mkdoc:gitTree:${parts.join('|')}`;
+                },
+                readCachedTreeAny() {
+                    try {
+                        const raw = localStorage.getItem(this.getCacheKey());
+                        if (!raw) return null;
+                        const parsed = JSON.parse(raw);
+                        if (!parsed || !Array.isArray(parsed.tree) || !parsed.fetchedAt) return null;
+                        return parsed;
+                    } catch (error) {
+                        console.warn("[Cache] Failed to read cache:", error);
+                        return null;
+                    }
+                },
+                readCachedTree() {
+                    const parsed = this.readCachedTreeAny();
+                    if (!parsed) return null;
+                    const ageMs = Date.now() - parsed.fetchedAt;
+                    if (ageMs > this.config.TREE_CACHE_TTL_MS) return null;
+                    return parsed;
+                },
+                writeCachedTree(tree, etag) {
+                    try {
+                        const payload = { tree, fetchedAt: Date.now(), etag: etag || null };
+                        localStorage.setItem(this.getCacheKey(), JSON.stringify(payload));
+                    } catch (error) {
+                        console.warn("[Cache] Failed to write cache:", error);
+                    }
+                },
+                clearCachedTree() {
+                    try {
+                        localStorage.removeItem(this.getCacheKey());
+                    } catch (error) {
+                        console.warn("[Cache] Failed to clear cache:", error);
+                    }
+                },
+                formatCacheInfo(fetchedAt) {
+                    const date = new Date(fetchedAt);
+                    return `缓存时间: ${date.toLocaleString()}`;
+                },
+                async fetchGitHubTree(forceRefresh = false) {
                     this.isLoadingDirectory = true;
                     this.directoryError = null;
+                    this.directoryNotice = '';
                     if (!this.config.GITHUB_OWNER || !this.config.GITHUB_REPO || !this.config.GITHUB_BRANCH) {
                         const errorMsg = "<strong>配置错误:</strong> GitHub Owner, Repository, 或 Branch 未设置。";
                         console.error("[API] fetchTree PRE-CHECK FAILED:", errorMsg);
@@ -266,18 +368,47 @@
                         this.isLoadingDirectory = false;
                         return null;
                     }
+
+                    const cachedAny = this.readCachedTreeAny();
+                    if (!forceRefresh) {
+                        const cached = cachedAny;
+                        if (cached) {
+                            console.log("[Cache] Using cached GitHub tree.");
+                            this._rawGitTree = cached.tree || [];
+                            this.directoryCacheInfo = this.formatCacheInfo(cached.fetchedAt);
+                            return this._rawGitTree;
+                        }
+                    }
+
                     const apiUrl = `${this.config.API_BASE_URL}/repos/${this.config.GITHUB_OWNER}/${this.config.GITHUB_REPO}/git/trees/${this.config.GITHUB_BRANCH}?recursive=1`;
                     console.log(`[API] Fetching tree from: ${apiUrl}`);
                     try {
-                        const response = await fetch(apiUrl, { headers: { "Accept": "application/vnd.github.v3+json" } });
+                        const headers = { "Accept": "application/vnd.github.v3+json" };
+                        if (cachedAny && cachedAny.etag) {
+                            headers["If-None-Match"] = cachedAny.etag;
+                        }
+                        const response = await fetch(apiUrl, { headers });
                         console.log(`[API] Fetch tree response status: ${response.status}`);
+                        if (response.status === 304 && cachedAny && cachedAny.tree) {
+                            console.log("[API] Tree not modified, using cached copy.");
+                            this._rawGitTree = cachedAny.tree || [];
+                            this.writeCachedTree(this._rawGitTree, cachedAny.etag);
+                            this.directoryCacheInfo = this.formatCacheInfo(Date.now());
+                            return this._rawGitTree;
+                        }
                         if (!response.ok) {
                             const errorData = await response.json().catch(() => ({ message: "无法解析错误响应" }));
                             throw new Error(`GitHub API 错误: ${response.status} - ${errorData.message}`);
                         }
                         const data = await response.json();
-                        if (data.truncated) console.warn("[API] GitHub API 树信息被截断。");
+                        if (data.truncated) {
+                            console.warn("[API] GitHub API 树信息被截断。");
+                            this.directoryNotice = "注意: 仓库目录树被 GitHub 截断，可能无法显示完整文件列表。";
+                        }
                         this._rawGitTree = data.tree || [];
+                        const etag = response.headers.get("ETag");
+                        this.writeCachedTree(this._rawGitTree, etag);
+                        this.directoryCacheInfo = this.formatCacheInfo(Date.now());
                         console.log(`[API] Fetched ${this._rawGitTree.length} items.`);
                         return this._rawGitTree;
                     } catch (error) {
@@ -359,10 +490,16 @@
                     html += '</ul>';
                     return html;
                 },
-                async displayDirectory() {
+                async displayDirectory(forceRefresh = false) {
                     this.isLoadingDirectory = true;
                     this.directoryError = null;
-                    const treeItems = await this.fetchGitHubTree();
+                    if (!forceRefresh && !this.directoryCacheInfo) {
+                        const cached = this.readCachedTree();
+                        if (cached) {
+                            this.directoryCacheInfo = this.formatCacheInfo(cached.fetchedAt);
+                        }
+                    }
+                    const treeItems = await this.fetchGitHubTree(forceRefresh);
                     if (treeItems) {
                         const directoryData = this.buildTreeData(treeItems);
                         this.directoryTreeHtml = this.renderDirectoryTreeHtml(directoryData);
@@ -371,6 +508,15 @@
                         }
                     }
                     this.isLoadingDirectory = false;
+                },
+                async refreshDirectory() {
+                    this.directoryCacheInfo = '正在手动拉取...';
+                    await this.displayDirectory(true);
+                },
+                clearDirectoryCache() {
+                    this.clearCachedTree();
+                    this.directoryCacheInfo = '缓存已清除';
+                    this.directoryNotice = '';
                 },
 
                 // --- 3. Markdown Rendering ---
@@ -391,7 +537,13 @@
                             throw new Error(`获取文件失败: ${response.status} ${response.statusText}`);
                         }
                         const markdownText = await response.text();
-                        this.renderedMarkdown = marked.parse(markdownText);
+                        const unsafeHtml = marked.parse(markdownText);
+                        if (window.DOMPurify) {
+                            this.renderedMarkdown = DOMPurify.sanitize(unsafeHtml);
+                        } else {
+                            this.renderedMarkdown = unsafeHtml;
+                            this.contentError = "安全提示: DOMPurify 未加载，已渲染未经清洗的 HTML。";
+                        }
                         document.title = path;
                         console.log(`[Markdown] Successfully rendered: '${path}'`);
                     } catch (error) {
