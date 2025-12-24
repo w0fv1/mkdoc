@@ -89,6 +89,22 @@
             display: none;
         }
 
+        #directory-treefile-hint {
+            background-color: #112016;
+            color: #9de6b5;
+            padding: 8px 10px;
+            margin-bottom: 10px;
+            border: 1px solid #214a2b;
+            border-radius: 4px;
+            font-size: 0.9em;
+            white-space: pre-wrap;
+            flex-shrink: 0;
+        }
+
+        #directory-treefile-hint button {
+            margin-top: 8px;
+        }
+
         #directory-tree-container {
             flex-grow: 1;
             /* Allow tree to take remaining space and scroll */
@@ -214,6 +230,10 @@
             </div>
             <div id="directory-cache-info" v-if="directoryCacheInfo">{{ directoryCacheInfo }}</div>
             <div id="directory-notice-display" v-if="directoryNotice" v-html="directoryNotice"></div>
+            <div id="directory-treefile-hint" v-if="treeFileHint">
+                <div v-html="treeFileHint"></div>
+                <button @click="copyTreeFileContent" :disabled="!treeFileCopyPayload">复制目录树文件内容</button>
+            </div>
             <div id="directory-error-display" v-if="directoryError" v-html="directoryError"></div>
             <div id="directory-tree-container">
                 <div v-if="isLoadingDirectory">正在加载目录...</div>
@@ -243,13 +263,15 @@
                     DEFAULT_MARKDOWN_FILE: 'README.md',
                     API_BASE_URL: 'https://api.github.com',
                     TREE_CACHE_TTL_MS: 1000 * 60 * 60 * 6,
-                    // GITHUB_TOKEN: null,
+                    TREE_FILE_NAME: 'mkdoc.tree.json',
                 },
                 isLoadingDirectory: true,
                 directoryTreeHtml: '',
                 directoryError: null, // For errors related to fetching/building directory
                 directoryCacheInfo: '',
                 directoryNotice: '',
+                treeFileHint: '',
+                treeFileCopyPayload: '',
 
                 currentMarkdownPath: '',
                 renderedMarkdown: '正在加载...',
@@ -338,6 +360,103 @@
                     if (ageMs > this.config.TREE_CACHE_TTL_MS) return null;
                     return parsed;
                 },
+                getTreeFilePath() {
+                    return this.config.TREE_FILE_NAME || '';
+                },
+                normalizeTreeItems(items) {
+                    if (!Array.isArray(items)) return [];
+                    const normalized = [];
+                    items.forEach(item => {
+                        if (!item || !item.path) return;
+                        const rawType = (item.type || '').toString().toLowerCase();
+                        let type = rawType;
+                        if (rawType === 'file') type = 'blob';
+                        if (rawType === 'folder' || rawType === 'dir' || rawType === 'directory') type = 'tree';
+                        if (type !== 'blob' && type !== 'tree') type = 'blob';
+                        normalized.push({ path: String(item.path), type });
+                    });
+                    return normalized;
+                },
+                extractTreeItemsFromFile(payload) {
+                    if (!payload) return null;
+                    if (Array.isArray(payload)) return this.normalizeTreeItems(payload);
+                    if (Array.isArray(payload.items)) return this.normalizeTreeItems(payload.items);
+                    if (Array.isArray(payload.tree)) return this.normalizeTreeItems(payload.tree);
+                    return null;
+                },
+                createTreeFilePayload(items, rootHint) {
+                    return {
+                        version: 1,
+                        generatedAt: new Date().toISOString(),
+                        root: rootHint || '',
+                        items: this.normalizeTreeItems(items)
+                    };
+                },
+                async fetchTreeFile() {
+                    const treeFilePath = this.getTreeFilePath();
+                    if (!treeFilePath) return null;
+                    try {
+                        const response = await fetch(treeFilePath, { cache: "no-store" });
+                        if (response.status === 404) return null;
+                        if (!response.ok) {
+                            throw new Error(`目录树文件请求失败: ${response.status} ${response.statusText}`);
+                        }
+                        const text = await response.text();
+                        const payload = JSON.parse(text);
+                        const items = this.extractTreeItemsFromFile(payload);
+                        if (!items || items.length === 0) {
+                            throw new Error("目录树文件内容为空或格式不正确");
+                        }
+                        return { items, payload };
+                    } catch (error) {
+                        console.warn("[TreeFile] Failed to load tree file:", error);
+                        this.directoryNotice = `目录树文件读取失败，已回退到 GitHub API。<br>${error.message}`;
+                        return null;
+                    }
+                },
+                setTreeFileHintFromGitHub(items) {
+                    const rootHint = this.config.PAGES_ROOT_IN_REPO || '.';
+                    const treeFilePath = this.getTreeFilePath() || 'mkdoc.tree.json';
+                    this.treeFileHint = `未发现目录树文件 <code>${treeFilePath}</code>。建议在仓库中生成并提交该文件以避免 API 限流。<br>` +
+                        `可运行：<code>node scripts/mkdoc-generate-tree.mjs --root ${rootHint} --out ${treeFilePath}</code><br>` +
+                        `或点击下方按钮复制目录树文件内容后自行新建并提交。`;
+                    const payload = this.createTreeFilePayload(items, this.config.PAGES_ROOT_IN_REPO || '');
+                    this.treeFileCopyPayload = JSON.stringify(payload, null, 2);
+                },
+                async copyTreeFileContent() {
+                    if (!this.treeFileCopyPayload) return;
+                    const ok = await this.copyTextToClipboard(this.treeFileCopyPayload);
+                    if (ok) {
+                        this.directoryNotice = "目录树文件内容已复制到剪贴板，可新建文件并提交到仓库。";
+                    } else {
+                        this.directoryNotice = "复制失败，请手动复制目录树文件内容。";
+                    }
+                },
+                async copyTextToClipboard(text) {
+                    try {
+                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                            await navigator.clipboard.writeText(text);
+                            return true;
+                        }
+                    } catch (error) {
+                        console.warn("[Clipboard] Clipboard API failed:", error);
+                    }
+                    try {
+                        const textarea = document.createElement('textarea');
+                        textarea.value = text;
+                        textarea.setAttribute('readonly', '');
+                        textarea.style.position = 'absolute';
+                        textarea.style.left = '-9999px';
+                        document.body.appendChild(textarea);
+                        textarea.select();
+                        const ok = document.execCommand('copy');
+                        document.body.removeChild(textarea);
+                        return ok;
+                    } catch (error) {
+                        console.warn("[Clipboard] execCommand copy failed:", error);
+                        return false;
+                    }
+                },
                 writeCachedTree(tree, etag) {
                     try {
                         const payload = { tree, fetchedAt: Date.now(), etag: etag || null };
@@ -371,7 +490,7 @@
 
                     const cachedAny = this.readCachedTreeAny();
                     if (!forceRefresh) {
-                        const cached = cachedAny;
+                        const cached = this.readCachedTree();
                         if (cached) {
                             console.log("[Cache] Using cached GitHub tree.");
                             this._rawGitTree = cached.tree || [];
@@ -398,7 +517,24 @@
                         }
                         if (!response.ok) {
                             const errorData = await response.json().catch(() => ({ message: "无法解析错误响应" }));
-                            throw new Error(`GitHub API 错误: ${response.status} - ${errorData.message}`);
+                            const message = (errorData && errorData.message) ? String(errorData.message) : "未知错误";
+                            const isRateLimit = response.status === 403 && message.toLowerCase().includes("rate limit exceeded");
+                            if (isRateLimit) {
+                                const reset = response.headers.get("X-RateLimit-Reset");
+                                const resetEpochSeconds = reset ? parseInt(reset, 10) : NaN;
+                                const resetAt = Number.isFinite(resetEpochSeconds) ? new Date(resetEpochSeconds * 1000) : null;
+                                const resetText = resetAt && !Number.isNaN(resetAt.getTime()) ? resetAt.toLocaleString() : null;
+
+                                if (cachedAny && cachedAny.tree) {
+                                    console.warn("[API] Rate limit exceeded; falling back to cached tree.");
+                                    this.directoryNotice = `GitHub API 达到速率限制${resetText ? `（预计 ${resetText} 重置）` : ''}，已使用本地缓存目录。`;
+                                    this._rawGitTree = cachedAny.tree || [];
+                                    this.directoryCacheInfo = this.formatCacheInfo(cachedAny.fetchedAt);
+                                    return this._rawGitTree;
+                                }
+                                throw new Error(`GitHub API 速率限制已用尽${resetText ? `（预计 ${resetText} 重置）` : ''}。请稍后再试，或减少刷新频率。`);
+                            }
+                            throw new Error(`GitHub API 错误: ${response.status} - ${message}`);
                         }
                         const data = await response.json();
                         if (data.truncated) {
@@ -493,17 +629,51 @@
                 async displayDirectory(forceRefresh = false) {
                     this.isLoadingDirectory = true;
                     this.directoryError = null;
+                    this.directoryNotice = '';
+                    this.treeFileHint = '';
+                    this.treeFileCopyPayload = '';
                     if (!forceRefresh && !this.directoryCacheInfo) {
                         const cached = this.readCachedTree();
                         if (cached) {
                             this.directoryCacheInfo = this.formatCacheInfo(cached.fetchedAt);
                         }
                     }
+                    const treeFileResult = await this.fetchTreeFile();
+                    if (treeFileResult && treeFileResult.items) {
+                        this.directoryNotice = `目录树来源: 目录树文件 <code>${this.getTreeFilePath()}</code>`;
+                        const directoryData = this.buildTreeData(treeFileResult.items);
+                        this.directoryTreeHtml = this.renderDirectoryTreeHtml(directoryData);
+                        if (!this.directoryTreeHtml && !this.directoryError) {
+                            this.directoryTreeHtml = '<p>目录为空或无 Markdown 文件。</p>';
+                        }
+                        this.isLoadingDirectory = false;
+                        return;
+                    }
+
                     const treeItems = await this.fetchGitHubTree(forceRefresh);
                     if (treeItems) {
+                        if (this.directoryNotice) {
+                            this.directoryNotice += "<br>目录树来源: GitHub API";
+                        } else {
+                            this.directoryNotice = "目录树来源: GitHub API";
+                        }
                         const directoryData = this.buildTreeData(treeItems);
                         this.directoryTreeHtml = this.renderDirectoryTreeHtml(directoryData);
-                        if (!this.directoryTreeHtml && !this.directoryError) { // buildTreeData might set an error
+                        if (!this.directoryTreeHtml && !this.directoryError) {
+                            this.directoryTreeHtml = '<p>目录为空或无 Markdown 文件。</p>';
+                        }
+                        this.setTreeFileHintFromGitHub(treeItems);
+                        this.isLoadingDirectory = false;
+                        return;
+                    }
+
+                    const cachedAny = this.readCachedTree();
+                    if (cachedAny && cachedAny.tree) {
+                        this.directoryNotice = "GitHub API 不可用，已回退到本地缓存目录。";
+                        this.directoryCacheInfo = this.formatCacheInfo(cachedAny.fetchedAt);
+                        const directoryData = this.buildTreeData(cachedAny.tree || []);
+                        this.directoryTreeHtml = this.renderDirectoryTreeHtml(directoryData);
+                        if (!this.directoryTreeHtml && !this.directoryError) {
                             this.directoryTreeHtml = '<p>目录为空或无 Markdown 文件。</p>';
                         }
                     }
@@ -595,7 +765,8 @@
         //     GITHUB_OWNER: "your_username",
         //     GITHUB_REPO: "your_repo_name",
         //     GITHUB_BRANCH: "main", // or "gh-pages"
-        //     PAGES_ROOT_IN_REPO: "" // or "docs"
+        //     PAGES_ROOT_IN_REPO: "", // or "docs"
+        //     TREE_FILE_NAME: "mkdoc.tree.json"
         // };
     </script>
 </body>

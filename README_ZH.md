@@ -1,16 +1,18 @@
-# MKDOC - 简洁的 Vue Markdown 查看器
+# MKDOC - 即放即用的 Markdown 文档查看器
 
-[English Version](https://w0fv1.github.io/mkdoc/#READMD_EN.md)
+[English Version](READMD.md)
 
-MKDOC 是一个基于 Vue.js 2 的单页面应用程序，用于在浏览器中查看托管在 GitHub 仓库中的 Markdown 文件。它会自动从指定的 GitHub 仓库拉取文件目录结构，并使用 `marked.js` 渲染 Markdown 内容，提供一个类似 GitHub Pages 的文档浏览体验。
+MKDOC 是一个单文件、无需构建的 Markdown 文档查看器。放进仓库即可使用，自动生成目录并渲染 Markdown，适合快速发布与分享。
 
 ## ✨ 特性
 
-*   **动态目录树**: 从 GitHub API 获取并展示仓库中的文件目录结构。
-*   **Markdown 渲染**: 使用 `marked.js` 将 Markdown 文件渲染为 HTML。
+*   **单文件，零构建**: 仅需一个 `index.html`，无需安装依赖。
+*   **目录树文件优先**: 支持仓库内 `mkdoc.tree.json` 文件，优先使用静态目录树以避免 API 限流。
+*   **API 回退 + 缓存**: 需要时使用 GitHub API，并自动回退到本地缓存。
+*   **Markdown 渲染**: 将 Markdown 文件渲染为 HTML。
 *   **GitHub 样式**: 使用 `github-markdown-css` (暗黑主题) 以获得熟悉的 GitHub 阅读体验。
 *   **URL Hash 导航**: 通过 URL hash (例如 `#path/to/your/file.md`) 进行文件间的导航和分享。
-*   **高度可配置**:
+*   **配置灵活**:
     *   支持配置 GitHub 用户名、仓库名、分支。
     *   支持指定 Markdown 文件在仓库中的根目录 (例如 `docs/`)。
     *   可设置默认加载的 Markdown 文件 (例如 `README.md`)。
@@ -20,17 +22,17 @@ MKDOC 是一个基于 Vue.js 2 的单页面应用程序，用于在浏览器中�
 
 ## 🚀 如何使用
 
-1.  **下载/获取文件**:
-    *   将此 `index.html` 文件下载到您的项目中。
+1.  **放入文件**:
+    *   将 `index.html` 放到你的文档仓库中。
 
-2.  **配置 (重要!)**:
-    MKDOC 依赖于正确的 GitHub 仓库配置。您可以通过 `window.AppConfig` 对象进行配置。在 `index.html` 文件的 `<script>` 标签底部，您可以看到一个被注释掉的 `window.AppConfig` 示例。取消注释并修改它：
+2.  **配置仓库信息**:
+    通过 `window.AppConfig` 指定仓库信息。在 `index.html` 底部 `<script>` 中有示例，取消注释并修改：
 
     ```html
     <script>
-        // ... Vue app code ...
+        // ... app code ...
 
-        // Optional: For overriding Vue AppConfig easily from another script or HTML
+        // 可选：从其他脚本或 HTML 覆盖 AppConfig
         window.AppConfig = {
             GITHUB_OWNER: "your_github_username", // 你的 GitHub 用户名或组织名
             GITHUB_REPO: "your_repository_name",  // 你的 GitHub 仓库名
@@ -38,7 +40,7 @@ MKDOC 是一个基于 Vue.js 2 的单页面应用程序，用于在浏览器中�
             PAGES_ROOT_IN_REPO: "",               // 如果 Markdown 文件在仓库的 "docs" 文件夹下, 则设置为 "docs"
                                                   // 如果就在根目录, 保持为空字符串 ""
             DEFAULT_MARKDOWN_FILE: "README.md"    // 当 URL hash 为空时默认加载的文件
-            // GITHUB_TOKEN: null, // 可选: 用于访问私有仓库或避免 API 速率限制 (在客户端暴露有安全风险，请谨慎！)
+            // TREE_FILE_NAME: "mkdoc.tree.json"  // 可选: 自定义目录树文件名
         };
     </script>
     ```
@@ -50,21 +52,34 @@ MKDOC 是一个基于 Vue.js 2 的单页面应用程序，用于在浏览器中�
     *   **`DEFAULT_MARKDOWN_FILE`**: 当用户首次访问或 URL hash 为空时，默认显示的 Markdown 文件路径 (相对于 `PAGES_ROOT_IN_REPO` 或仓库根目录)。
     *   **`AUTO_INFER_CONFIG`**: (默认为 `true`) 如果设置为 `true` 且应用部署在标准的 GitHub Pages URL (如 `owner.github.io/repo` 或 `owner.github.io` 对于用户/组织页面)，它会尝试自动推断 `GITHUB_OWNER` 和 `GITHUB_REPO`。如果手动设置了 `GITHUB_OWNER` 和 `GITHUB_REPO`，则手动设置的值优先。
 
-3.  **部署**:
+3.  **生成目录树文件 (推荐)**:
+    运行脚本生成 `mkdoc.tree.json` 并提交，可避免 API 限流并加快加载：
+
+    ```bash
+    node scripts/mkdoc-generate-tree.mjs --root . --out mkdoc.tree.json
+    ```
+
+    如果你的 Markdown 位于 `docs/` 目录，可改为：
+
+    ```bash
+    node scripts/mkdoc-generate-tree.mjs --root docs --out mkdoc.tree.json
+    ```
+
+4.  **部署**:
     *   **GitHub Pages**:
         1.  将配置好的 `index.html` 文件推送到您的 GitHub 仓库（例如，推送到 `gh-pages` 分支，或者 `main` 分支的 `/docs` 目录，具体取决于您的 GitHub Pages 设置）。
         2.  确保您的 Markdown 文件也位于该仓库和分支的相应路径下。
         3.  在仓库的 "Settings" -> "Pages" 中配置 GitHub Pages 以从相应分支和文件夹提供服务。
     *   **其他静态托管**: 您也可以将此 `index.html` 部署到任何支持静态文件托管的服务上。
 
-4.  **访问**:
+5.  **访问**:
     打开您部署的 `index.html` 的 URL。
     *   左侧将显示文件目录。点击 `.md` 文件链接进行查看。
     *   您也可以直接通过 URL hash 访问特定文件，例如: `https://your-username.github.io/your-repo/#path/to/your/file.md` (如果 `PAGES_ROOT_IN_REPO` 为空) 或 `https://your-username.github.io/your-repo/#file.md` (如果 `PAGES_ROOT_IN_REPO` 为 `docs` 且 `file.md` 在 `docs` 目录下)。
 
 ## 🛠️ 配置选项详解
 
-这些配置项定义在 Vue 应用的 `data.config` 对象中，可以通过 `window.AppConfig` 覆盖。
+这些配置项定义在应用的 `data.config` 对象中，可以通过 `window.AppConfig` 覆盖。
 
 *   `AUTO_INFER_CONFIG` (布尔值, 默认: `true`): 是否尝试自动从 `window.location` 推断 GitHub Pages 配置。
 *   `GITHUB_OWNER` (字符串, 默认: `null`): GitHub 用户名或组织名。**必须配置 (如果自动推断失败或禁用)。**
@@ -73,11 +88,10 @@ MKDOC 是一个基于 Vue.js 2 的单页面应用程序，用于在浏览器中�
 *   `PAGES_ROOT_IN_REPO` (字符串, 默认: `''`): Markdown 文件在仓库中的相对根路径。例如，如果文件在 `repo/docs/` 目录下，则设置为 `"docs"`。这会影响目录树的构建和文件链接。
 *   `DEFAULT_MARKDOWN_FILE` (字符串, 默认: `'README.md'`): 当 URL hash 为空时默认加载的文件名 (路径相对于 `PAGES_ROOT_IN_REPO`)。
 *   `API_BASE_URL` (字符串, 默认: `'https://api.github.com'`): GitHub API 的基础 URL。
-*   `GITHUB_TOKEN` (字符串, 默认: `null`, 在代码中被注释): GitHub 个人访问令牌。可用于访问私有仓库或提高 API 速率限制。**警告**: 在客户端代码中嵌入令牌存在安全风险，仅在受信任的环境中使用或考虑后端代理。
+*   `TREE_FILE_NAME` (字符串, 默认: `'mkdoc.tree.json'`): 目录树文件名。若该文件存在，将优先使用它构建目录。
 
 ## 📦 依赖
 
-*   Vue.js 2.7.16
 *   marked.js 4.2.12
 *   github-markdown-css 5.8.1
 
