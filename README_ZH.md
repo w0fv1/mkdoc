@@ -1,6 +1,6 @@
 # MKDOC - 即放即用的 Markdown 文档查看器
 
-[English Version](READMD.md)
+[English Version](README.md)
 
 MKDOC 是一个单文件、无需构建的 Markdown 文档查看器。放进仓库即可使用，自动生成目录并渲染 Markdown，适合快速发布与分享。
 
@@ -11,6 +11,7 @@ MKDOC 是一个单文件、无需构建的 Markdown 文档查看器。放进仓�
 *   **API 回退 + 缓存**: 需要时使用 GitHub API，并自动回退到本地缓存。
 *   **Markdown 渲染**: 将 Markdown 文件渲染为 HTML。
 *   **GitHub 样式**: 使用 `github-markdown-css` (暗黑主题) 以获得熟悉的 GitHub 阅读体验。
+*   **Tailwind UI**: 应用外壳（侧栏、按钮、提示等）使用 TailwindCSS（CDN）。
 *   **URL Hash 导航**: 通过 URL hash (例如 `#path/to/your/file.md`) 进行文件间的导航和分享。
 *   **配置灵活**:
     *   支持配置 GitHub 用户名、仓库名、分支。

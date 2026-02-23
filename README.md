@@ -8,9 +8,10 @@ MKDOC is a single-file Markdown doc viewer. Drop it into your repo and you get a
 
 *   **Single File, Zero Build**: One `index.html` file that works out of the box.
 *   **Tree File First**: Supports a repository `mkdoc.tree.json` file and prefers it to avoid API rate limits.
-*   **GitHub API Fallback + Cache**: Uses the API when needed and falls back to local cache.
+*   **GitHub API Fallback + Cache**: Uses the API when needed and falls back to local cache (optional).
 *   **Markdown Rendering**: Renders Markdown files to HTML.
 *   **GitHub Styling**: Uses `github-markdown-css` (dark theme) for a familiar GitHub reading experience.
+*   **Tailwind UI**: Uses TailwindCSS (CDN) for the app shell (sidebar, buttons, notices).
 *   **URL Hash Navigation**: Navigate and share links to specific files using URL hashes (e.g., `#path/to/your/file.md`).
 *   **Configurable**:
     *   Supports configuration of GitHub username, repository name, and branch.
@@ -25,7 +26,22 @@ MKDOC is a single-file Markdown doc viewer. Drop it into your repo and you get a
 1.  **Drop in the file**:
     *   Put `index.html` into your docs repository.
 
-2.  **Configure your repo**:
+2.  **(Recommended) Generate a tree file**:
+    Generate `mkdoc.tree.json` and commit it to avoid API rate limits and make local preview work without any GitHub configuration:
+
+    ```bash
+    node scripts/mkdoc-generate-tree.mjs --root . --out mkdoc.tree.json
+    ```
+
+    If your Markdown files live in `docs/`, use:
+
+    ```bash
+    node scripts/mkdoc-generate-tree.mjs --root docs --out mkdoc.tree.json
+    ```
+
+3.  **(Optional) Configure GitHub API fallback**:
+    Only needed when you do **not** ship `mkdoc.tree.json`, or you want the app to fetch directory data from GitHub.
+
     Set repo details via `window.AppConfig`. At the bottom of `index.html` inside `<script>`, you'll find an example; uncomment and edit it:
 
     ```html
@@ -52,27 +68,23 @@ MKDOC is a single-file Markdown doc viewer. Drop it into your repo and you get a
     *   **`DEFAULT_MARKDOWN_FILE`**: The path to the Markdown file (relative to `PAGES_ROOT_IN_REPO` or repository root) to display by default when the user first visits or the URL hash is empty.
     *   **`AUTO_INFER_CONFIG`**: (Defaults to `true`) If `true` and the app is deployed on a standard GitHub Pages URL (like `owner.github.io/repo` or `owner.github.io` for user/org pages), it will try to infer `GITHUB_OWNER` and `GITHUB_REPO`. Manually set `GITHUB_OWNER` and `GITHUB_REPO` will take precedence.
 
-3.  **Generate a tree file (recommended)**:
-    Run the script to generate `mkdoc.tree.json` and commit it to avoid API rate limits and speed up loading:
+4.  **Local preview**:
+    If you generated `mkdoc.tree.json`, you can preview locally with any static file server:
 
     ```bash
-    node scripts/mkdoc-generate-tree.mjs --root . --out mkdoc.tree.json
+    python -m http.server 5173 --bind 127.0.0.1
     ```
 
-    If your Markdown files live in `docs/`, use:
+    Then open `http://127.0.0.1:5173/`.
 
-    ```bash
-    node scripts/mkdoc-generate-tree.mjs --root docs --out mkdoc.tree.json
-    ```
-
-4.  **Deployment**:
+5.  **Deployment**:
     *   **GitHub Pages**:
         1.  Push the configured `index.html` file to your GitHub repository (e.g., to a `gh-pages` branch, or the `/docs` folder on the `main` branch, depending on your GitHub Pages settings).
         2.  Ensure your Markdown files are also present in the repository and branch at the appropriate paths.
         3.  Configure GitHub Pages in your repository's "Settings" -> "Pages" to serve from the respective branch and folder.
     *   **Other Static Hosting**: You can also deploy this `index.html` to any service that supports static file hosting.
 
-5.  **Access**:
+6.  **Access**:
     Open the URL of your deployed `index.html`.
     *   The file directory will be shown on the left. Click on `.md` file links to view them.
     *   You can also access specific files directly via the URL hash, e.g.: `https://your-username.github.io/your-repo/#path/to/your/file.md` (if `PAGES_ROOT_IN_REPO` is empty) or `https://your-username.github.io/your-repo/#file.md` (if `PAGES_ROOT_IN_REPO` is `docs` and `file.md` is in the `docs` directory).
@@ -82,8 +94,8 @@ MKDOC is a single-file Markdown doc viewer. Drop it into your repo and you get a
 These configuration options live in the app's `data.config` object and can be overridden by `window.AppConfig`.
 
 *   `AUTO_INFER_CONFIG` (Boolean, Default: `true`): Whether to attempt auto-inference of GitHub Pages config from `window.location`.
-*   `GITHUB_OWNER` (String, Default: `null`): GitHub username or organization. **Must be configured (if auto-infer fails or is disabled).**
-*   `GITHUB_REPO` (String, Default: `null`): GitHub repository name. **Must be configured (if auto-infer fails or is disabled).**
+*   `GITHUB_OWNER` (String, Default: `null`): GitHub username or organization. Required only when using the GitHub API fallback (i.e. when you do not ship `mkdoc.tree.json`).
+*   `GITHUB_REPO` (String, Default: `null`): GitHub repository name. Required only when using the GitHub API fallback (i.e. when you do not ship `mkdoc.tree.json`).
 *   `GITHUB_BRANCH` (String, Default: `'main'`): The branch from which to fetch the directory tree and content.
 *   `PAGES_ROOT_IN_REPO` (String, Default: `''`): The relative root path for Markdown files within the repository. E.g., if files are in `repo/docs/`, set this to `"docs"`. This affects directory tree building and file linking.
 *   `DEFAULT_MARKDOWN_FILE` (String, Default: `'README.md'`): The filename (path relative to `PAGES_ROOT_IN_REPO`) to load by default when the URL hash is empty.
@@ -92,8 +104,13 @@ These configuration options live in the app's `data.config` object and can be ov
 
 ## 📦 Dependencies
 
+Loaded via CDN in `index.html`:
+
+*   Vue 2.7.16
 *   marked.js 4.2.12
-*   github-markdown-css 5.8.1
+*   DOMPurify 3.0.8
+*   github-markdown-css 5.8.1 (dark)
+*   TailwindCSS (via `cdn.tailwindcss.com`)
 
 ## 📄 License
 
