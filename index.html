@@ -4,250 +4,80 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vue Markdown Viewer</title>
+    <title>MkDoc</title>
     <link rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.8.1/github-markdown-dark.min.css" />
+    <script>
+        // Tailwind CDN: disable preflight to avoid interfering with github-markdown-css and browser defaults.
+        window.tailwind = { config: { corePlugins: { preflight: false } } };
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@2.7.16/dist/vue.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.2.12/marked.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.8/purify.min.js"></script>
-
-    <style>
-        body {
-            margin: 0;
-            background-color: #0d1117;
-            color: #c9d1d9;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
-            display: flex;
-            min-height: 100vh;
-        }
-
-        #app {
-            /* Vue app root */
-            display: flex;
-            width: 100%;
-            height: 100vh;
-        }
-
-        #sidebar {
-            width: 280px;
-            min-width: 200px;
-            max-width: 400px;
-            background-color: #161b22;
-            padding: 20px;
-            overflow-y: auto;
-            border-right: 1px solid #30363d;
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-        }
-
-        #sidebar h3 {
-            margin-top: 0;
-            color: #8b949e;
-            border-bottom: 1px solid #30363d;
-            padding-bottom: 10px;
-            flex-shrink: 0;
-            /* Prevent h3 from shrinking */
-        }
-
-        #directory-error-display,
-        #content-error-display {
-            background-color: #2c0b0b;
-            /* Dark red background for errors */
-            color: #ff8383;
-            /* Light red text for errors */
-            padding: 10px;
-            margin-bottom: 10px;
-            border: 1px solid #581e1e;
-            border-radius: 4px;
-            font-size: 0.9em;
-            white-space: pre-wrap;
-            /* Preserve line breaks in error messages */
-            flex-shrink: 0;
-            /* Prevent error display from shrinking */
-        }
-
-        #directory-error-display:empty,
-        #content-error-display:empty {
-            display: none;
-            /* Hide if no error */
-        }
-
-        #directory-notice-display {
-            background-color: #0d1f2b;
-            color: #8ec7ff;
-            padding: 8px 10px;
-            margin-bottom: 10px;
-            border: 1px solid #1b3a55;
-            border-radius: 4px;
-            font-size: 0.9em;
-            white-space: pre-wrap;
-            flex-shrink: 0;
-        }
-
-        #directory-notice-display:empty {
-            display: none;
-        }
-
-        #directory-treefile-hint {
-            background-color: #112016;
-            color: #9de6b5;
-            padding: 8px 10px;
-            margin-bottom: 10px;
-            border: 1px solid #214a2b;
-            border-radius: 4px;
-            font-size: 0.9em;
-            white-space: pre-wrap;
-            flex-shrink: 0;
-        }
-
-        #directory-treefile-hint button {
-            margin-top: 8px;
-        }
-
-        #directory-tree-container {
-            flex-grow: 1;
-            /* Allow tree to take remaining space and scroll */
-            overflow-y: auto;
-        }
-
-        #directory-actions {
-            display: flex;
-            gap: 8px;
-            margin: 10px 0 12px;
-        }
-
-        #directory-actions button {
-            background-color: #21262d;
-            color: #c9d1d9;
-            border: 1px solid #30363d;
-            padding: 6px 10px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-        }
-
-        #directory-actions button:hover {
-            background-color: #2d333b;
-        }
-
-        #directory-actions button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
-        #directory-cache-info {
-            color: #8b949e;
-            font-size: 12px;
-            margin-bottom: 8px;
-        }
-
-        #directory-tree ul {
-            list-style-type: none;
-            padding-left: 15px;
-        }
-
-        #directory-tree li {
-            margin-bottom: 5px;
-        }
-
-        #directory-tree a {
-            color: #58a6ff;
-            text-decoration: none;
-            cursor: pointer;
-        }
-
-        #directory-tree a:hover {
-            text-decoration: underline;
-        }
-
-        .folder {
-            font-weight: bold;
-            color: #c9d1d9;
-        }
-
-        .file {
-            color: #8b949e;
-        }
-
-        #main-content {
-            flex-grow: 1;
-            overflow-y: auto;
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-            padding: 20px;
-            /* Add padding here instead of markdown-body for error display positioning */
-        }
-
-        .markdown-body {
-            box-sizing: border-box;
-            min-width: 200px;
-            max-width: 980px;
-            width: 100%;
-            margin: 0 auto;
-            /* Center markdown content */
-            padding: 25px;
-            /* Original padding for markdown content itself */
-            flex-grow: 1;
-            /* Allow markdown body to take space */
-        }
-
-
-        @media (max-width: 767px) {
-            #app {
-                flex-direction: column;
-            }
-
-            #sidebar {
-                width: 100%;
-                max-width: none;
-                height: auto;
-                max-height: 40vh;
-                border-right: none;
-                border-bottom: 1px solid #30363d;
-            }
-
-            #main-content {
-                height: auto;
-                padding: 15px;
-            }
-
-            .markdown-body {
-                padding: 15px;
-            }
-        }
-    </style>
 </head>
 
-<body>
-    <div id="app">
-        <div id="sidebar">
-            <h3>File Directory</h3>
-            <div id="directory-actions">
-                <button @click="refreshDirectory" :disabled="isLoadingDirectory">Refresh Directory</button>
-                <button @click="clearDirectoryCache" :disabled="isLoadingDirectory">Clear Cache</button>
-            </div>
-            <div id="directory-cache-info" v-if="directoryCacheInfo">{{ directoryCacheInfo }}</div>
-            <div id="directory-notice-display" v-if="directoryNotice" v-html="directoryNotice"></div>
-            <div id="directory-treefile-hint" v-if="treeFileHint">
-                <div v-html="treeFileHint"></div>
-                <button @click="copyTreeFileContent" :disabled="!treeFileCopyPayload">Copy directory tree file content</button>
-            </div>
-            <div id="directory-error-display" v-if="directoryError" v-html="directoryError"></div>
-            <div id="directory-tree-container">
-                <div v-if="isLoadingDirectory">Loading directory...</div>
-                <div v-html="directoryTreeHtml" id="directory-tree"></div>
-            </div>
-        </div>
+<body class="m-0 min-h-screen bg-slate-950 text-slate-200 font-sans">
+        <div id="app" class="flex h-screen min-h-screen w-full flex-col md:flex-row">
+            <div id="sidebar"
+                class="flex max-h-[40vh] w-full flex-col overflow-y-auto border-b border-slate-700 bg-slate-900 p-5 md:max-h-none md:w-72 md:min-w-[200px] md:max-w-[400px] md:border-b-0 md:border-r">
+                <div class="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-700 pb-2.5">
+                    <h3 class="m-0 text-sm font-semibold tracking-wide text-slate-400">{{ t('contents') }}</h3>
+                    <div id="directory-actions" class="flex gap-2">
+                        <button @click="refreshDirectory" :disabled="isLoadingDirectory"
+                            class="rounded border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs text-slate-200 transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60">
+                            {{ t('reload') }}
+                        </button>
+                    </div>
+                </div>
 
-        <div id="main-content">
-            <div id="content-error-display" v-if="contentError" v-html="contentError"></div>
-            <div id="content" class="markdown-body" v-html="renderedMarkdown">
-                <!-- Content will be rendered here by Vue -->
+                <div id="directory-cache-info" v-if="directoryCacheInfo" class="mb-2 text-xs text-slate-400">{{
+                    directoryCacheInfo }}</div>
+                <div id="directory-notice-display" v-if="directoryNotice" v-html="directoryNotice"
+                    class="mb-2 whitespace-pre-wrap rounded border border-sky-900 bg-sky-950/60 px-2.5 py-2 text-sm text-sky-200">
+                </div>
+
+                <div id="directory-error-display" v-if="directoryError" v-html="directoryError"
+                    class="mb-2 whitespace-pre-wrap rounded border border-red-900 bg-red-950/60 px-2.5 py-2 text-sm text-red-200">
+                </div>
+
+                <div id="directory-tree-container" class="flex-1 overflow-y-auto">
+                    <div v-if="isLoadingDirectory" class="text-sm text-slate-400">{{ t('loading_contents') }}</div>
+                    <div v-html="directoryTreeHtml" id="directory-tree" class="text-sm"></div>
+                </div>
+
+                <details id="directory-advanced" class="mt-3 shrink-0 border-t border-slate-700 pt-3">
+                    <summary class="cursor-pointer select-none text-sm text-slate-400">{{ t('advanced') }}</summary>
+                    <div id="directory-debug-display" v-if="directoryDebug" v-html="directoryDebug"
+                        class="mt-2 whitespace-pre-wrap rounded border border-sky-900 bg-sky-950/60 px-2.5 py-2 text-sm text-sky-200">
+                    </div>
+                    <div id="directory-treefile-hint" v-if="treeFileHint"
+                        class="mt-2 whitespace-pre-wrap rounded border border-emerald-900 bg-emerald-950/40 px-2.5 py-2 text-sm text-emerald-200">
+                        <div v-html="treeFileHint"></div>
+                        <button @click="copyTreeFileContent" :disabled="!treeFileCopyPayload"
+                            class="mt-2 rounded border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs text-slate-200 transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60">
+                            {{ t('copy_index_file') }}
+                        </button>
+                    </div>
+                    <div id="directory-advanced-actions" class="mt-2 flex gap-2">
+                        <button @click="clearDirectoryCache" :disabled="isLoadingDirectory"
+                            class="rounded border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs text-slate-200 transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60">
+                            {{ t('clear_cache') }}
+                        </button>
+                    </div>
+                </details>
+            </div>
+
+            <div id="main-content" class="flex flex-1 flex-col overflow-y-auto p-4 md:p-5">
+                <div id="content-error-display" v-if="contentError" v-html="contentError"
+                    class="mb-2 whitespace-pre-wrap rounded border border-red-900 bg-red-950/60 px-2.5 py-2 text-sm text-red-200">
+                </div>
+                <div id="content" class="markdown-body box-border flex-1 w-full min-w-[200px] max-w-[980px] mx-auto p-4 md:p-6"
+                    v-html="renderedMarkdown">
+                    <!-- Content will be rendered here by Vue -->
+                </div>
             </div>
         </div>
-    </div>
 
     <script>
         // --- Vue Application ---
@@ -270,8 +100,10 @@
                 directoryError: null, // For errors related to fetching/building directory
                 directoryCacheInfo: '',
                 directoryNotice: '',
+                directoryDebug: '',
                 treeFileHint: '',
                 treeFileCopyPayload: '',
+                lang: ((navigator && navigator.language) ? navigator.language : 'en').toLowerCase(),
 
                 currentMarkdownPath: '',
                 renderedMarkdown: 'Loading...',
@@ -280,7 +112,9 @@
                 _rawGitTree: [] // To store the fetched git tree items
             },
             computed: {
-                // You can add computed properties if needed
+                isZh() {
+                    return (this.lang || '').startsWith('zh');
+                }
             },
             watch: {},
             created() {
@@ -294,6 +128,29 @@
                 window.removeEventListener('hashchange', this.handleHashChange);
             },
             methods: {
+                t(key) {
+                    const dict = {
+                        contents: { en: 'Contents', zh: '目录' },
+                        reload: { en: 'Reload', zh: '刷新' },
+                        advanced: { en: 'More', zh: '更多' },
+                        clear_cache: { en: 'Clear saved list', zh: '清除缓存' },
+                        copy_index_file: { en: 'Copy index file content', zh: '复制目录索引内容' },
+                        loading_contents: { en: 'Loading…', zh: '加载中…' },
+                        refreshing: { en: 'Refreshing…', zh: '刷新中…' },
+                        cache_cleared: { en: 'Cleared', zh: '已清除' },
+                        last_updated: { en: 'Last updated', zh: '更新时间' },
+                        confirm_clear_cache: { en: 'Clear the saved directory list on this device?', zh: '确认清除本设备保存的目录缓存？' },
+                        notice_treefile_failed: { en: 'Could not read the directory index file; switching to the online list.', zh: '无法读取目录索引文件，已切换为在线目录。' },
+                        notice_rate_limit_cache: { en: 'Online access is temporarily limited; showing the saved list.', zh: '在线访问暂时受限，正在显示已保存的目录。' },
+                        notice_tree_truncated: { en: 'Some items may be missing in the list.', zh: '目录可能不完整（部分条目可能缺失）。' },
+                        notice_offline_cache: { en: 'Offline — showing the saved list.', zh: '离线状态：显示已保存的目录。' },
+                        notice_index_copied: { en: 'Index content copied.', zh: '索引内容已复制。' },
+                        notice_copy_failed: { en: 'Copy failed. Please copy manually.', zh: '复制失败，请手动复制。' }
+                    };
+                    const entry = dict[key];
+                    if (!entry) return String(key);
+                    return this.isZh ? (entry.zh || entry.en) : (entry.en || entry.zh);
+                },
                 // --- 1. Configuration ---
                 initializeConfiguration() {
                     console.log("[Config] Initializing configuration...");
@@ -314,6 +171,11 @@
                     console.log("[ConfigInfer] Starting config inference...");
                     const hostname = window.location.hostname;
                     const pathname = window.location.pathname;
+                    if (!hostname.endsWith(".github.io")) {
+                        console.warn(`[ConfigInfer] Hostname '${hostname}' is not a standard GitHub Pages domain. Manual GITHUB_OWNER/GITHUB_REPO in AppConfig recommended if you want to use the GitHub API.`);
+                        return;
+                    }
+
                     let inferredOwner = hostname.split('.')[0];
                     let inferredRepo = null;
 
@@ -321,8 +183,7 @@
                         const pathSegments = pathname.split('/').filter(Boolean);
                         inferredRepo = pathSegments.length > 0 ? pathSegments[0] : `${inferredOwner}.github.io`;
                     } else {
-                        console.warn(`[ConfigInfer] Hostname '${hostname}' is custom or non-standard. Manual GITHUB_OWNER/GITHUB_REPO in AppConfig recommended.`);
-                        // For custom domains, repo cannot be reliably inferred from URL. Owner might be from hostname.
+                        // Should not reach here since we guard on .github.io above.
                     }
 
                     if (this.config.GITHUB_OWNER === null) this.config.GITHUB_OWNER = inferredOwner;
@@ -410,16 +271,23 @@
                         return { items, payload };
                     } catch (error) {
                         console.warn("[TreeFile] Failed to load tree file:", error);
-                        this.directoryNotice = `Failed to read the directory tree file, falling back to the GitHub API.<br>${error.message}`;
+                        this.directoryNotice = this.t('notice_treefile_failed');
+                        this.directoryDebug = `Tree file read failed (<code>${this.getTreeFilePath()}</code>); falling back to GitHub API.<br>${error.message}`;
                         return null;
                     }
                 },
                 setTreeFileHintFromGitHub(items) {
                     const rootHint = this.config.PAGES_ROOT_IN_REPO || '.';
                     const treeFilePath = this.getTreeFilePath() || 'mkdoc.tree.json';
-                    this.treeFileHint = `Directory tree file <code>${treeFilePath}</code> not found. Generate and commit this file in your repository to avoid API rate limits.<br>` +
-                        `You can run: <code>node scripts/mkdoc-generate-tree.mjs --root ${rootHint} --out ${treeFilePath}</code><br>` +
-                        `Or click the button below to copy the tree file contents, then create and commit the file manually.`;
+                    if (this.isZh) {
+                        this.treeFileHint = `未找到目录索引文件 <code>${treeFilePath}</code>。你可以生成并提交该文件，以减少在线请求、加快加载。<br>` +
+                            `可运行：<code>node scripts/mkdoc-generate-tree.mjs --root ${rootHint} --out ${treeFilePath}</code><br>` +
+                            `或点击下方按钮复制索引内容，然后手动创建并提交该文件。`;
+                    } else {
+                        this.treeFileHint = `Directory index file <code>${treeFilePath}</code> not found. You can generate and commit it to reduce online requests and load faster.<br>` +
+                            `Run: <code>node scripts/mkdoc-generate-tree.mjs --root ${rootHint} --out ${treeFilePath}</code><br>` +
+                            `Or click the button below to copy the index content and create the file manually.`;
+                    }
                     const payload = this.createTreeFilePayload(items, this.config.PAGES_ROOT_IN_REPO || '');
                     this.treeFileCopyPayload = JSON.stringify(payload, null, 2);
                 },
@@ -427,9 +295,9 @@
                     if (!this.treeFileCopyPayload) return;
                     const ok = await this.copyTextToClipboard(this.treeFileCopyPayload);
                     if (ok) {
-                        this.directoryNotice = "Directory tree file content copied to the clipboard; you can create the file and commit it to your repository.";
+                        this.directoryNotice = this.t('notice_index_copied');
                     } else {
-                        this.directoryNotice = "Copy failed; please copy the directory tree file content manually.";
+                        this.directoryNotice = this.t('notice_copy_failed');
                     }
                 },
                 async copyTextToClipboard(text) {
@@ -474,17 +342,15 @@
                 },
                 formatCacheInfo(fetchedAt) {
                     const date = new Date(fetchedAt);
-                    return `Cache timestamp: ${date.toLocaleString()}`;
+                    return `${this.t('last_updated')}: ${date.toLocaleString()}`;
                 },
                 async fetchGitHubTree(forceRefresh = false) {
                     this.isLoadingDirectory = true;
                     this.directoryError = null;
                     this.directoryNotice = '';
+                    this.directoryDebug = '';
                     if (!this.config.GITHUB_OWNER || !this.config.GITHUB_REPO || !this.config.GITHUB_BRANCH) {
-                        const errorMsg = "<strong>Configuration error:</strong> GitHub Owner, Repository, or Branch is not set.";
-                        console.error("[API] fetchTree PRE-CHECK FAILED:", errorMsg);
-                        this.directoryError = errorMsg;
-                        this.isLoadingDirectory = false;
+                        console.warn("[API] GitHub config missing; skipping GitHub API directory fetch.");
                         return null;
                     }
 
@@ -527,7 +393,8 @@
 
                                 if (cachedAny && cachedAny.tree) {
                                     console.warn("[API] Rate limit exceeded; falling back to cached tree.");
-                                    this.directoryNotice = `GitHub API rate limit reached${resetText ? ` (resets around ${resetText})` : ''}; using the local cache.`;
+                                    this.directoryNotice = this.t('notice_rate_limit_cache');
+                                    this.directoryDebug = `GitHub API rate limit reached${resetText ? ` (resets around ${resetText})` : ''}; using the local cache.`;
                                     this._rawGitTree = cachedAny.tree || [];
                                     this.directoryCacheInfo = this.formatCacheInfo(cachedAny.fetchedAt);
                                     return this._rawGitTree;
@@ -539,7 +406,8 @@
                         const data = await response.json();
                         if (data.truncated) {
                             console.warn("[API] GitHub API tree data truncated.");
-                            this.directoryNotice = "Note: GitHub truncated the repository tree, so some files may not appear.";
+                            this.directoryNotice = this.t('notice_tree_truncated');
+                            this.directoryDebug = "Note: GitHub truncated the repository tree, so some files may not appear.";
                         }
                         this._rawGitTree = data.tree || [];
                         const etag = response.headers.get("ETag");
@@ -597,7 +465,7 @@
                     return tree;
                 },
                 renderDirectoryTreeHtml(node) {
-                    let html = '<ul>';
+                    let html = '<ul class="list-none pl-4">';
                     const sortedKeys = Object.keys(node).sort((a, b) => {
                         const aIsDir = node[a]._type === 'folder';
                         const bIsDir = node[b]._type === 'folder';
@@ -608,17 +476,17 @@
 
                     for (const key of sortedKeys) {
                         const item = node[key];
-                        html += '<li>';
+                        html += '<li class="mb-1">';
                         if (item._type === 'folder') {
-                            html += `<span class="folder">${item._name}</span>`;
+                            html += `<span class="font-semibold text-slate-200">${item._name}</span>`;
                             if (Object.keys(item._children).length > 0) {
                                 html += this.renderDirectoryTreeHtml(item._children);
                             }
                         } else if (item._type === 'file') {
                             if (item._path && item._name.toLowerCase().endsWith('.md')) {
-                                html += `<a href="#${item._path}" class="file-md">${item._name}</a>`;
+                                html += `<a href="#${item._path}" class="text-sky-400 hover:underline">${item._name}</a>`;
                             } else {
-                                html += `<span class="file">${item._name}</span>`;
+                                html += `<span class="text-slate-400">${item._name}</span>`;
                             }
                         }
                         html += '</li>';
@@ -630,8 +498,10 @@
                     this.isLoadingDirectory = true;
                     this.directoryError = null;
                     this.directoryNotice = '';
+                    this.directoryDebug = '';
                     this.treeFileHint = '';
                     this.treeFileCopyPayload = '';
+                    this.directoryTreeHtml = '';
                     if (!forceRefresh && !this.directoryCacheInfo) {
                         const cached = this.readCachedTree();
                         if (cached) {
@@ -640,7 +510,7 @@
                     }
                     const treeFileResult = await this.fetchTreeFile();
                     if (treeFileResult && treeFileResult.items) {
-                        this.directoryNotice = `Directory tree source: directory tree file <code>${this.getTreeFilePath()}</code>`;
+                        this.directoryDebug = `Directory source: index file <code>${this.getTreeFilePath()}</code>`;
                         const directoryData = this.buildTreeData(treeFileResult.items);
                         this.directoryTreeHtml = this.renderDirectoryTreeHtml(directoryData);
                         if (!this.directoryTreeHtml && !this.directoryError) {
@@ -652,11 +522,7 @@
 
                     const treeItems = await this.fetchGitHubTree(forceRefresh);
                     if (treeItems) {
-                        if (this.directoryNotice) {
-                            this.directoryNotice += "<br>Directory tree source: GitHub API";
-                        } else {
-                            this.directoryNotice = "Directory tree source: GitHub API";
-                        }
+                        this.directoryDebug = (this.directoryDebug ? `${this.directoryDebug}<br>` : '') + "Directory source: GitHub API";
                         const directoryData = this.buildTreeData(treeItems);
                         this.directoryTreeHtml = this.renderDirectoryTreeHtml(directoryData);
                         if (!this.directoryTreeHtml && !this.directoryError) {
@@ -669,7 +535,8 @@
 
                     const cachedAny = this.readCachedTree();
                     if (cachedAny && cachedAny.tree) {
-                        this.directoryNotice = "GitHub API unavailable; falling back to the local cached directory.";
+                        this.directoryNotice = this.t('notice_offline_cache');
+                        this.directoryDebug = "GitHub API unavailable; falling back to the local cached directory.";
                         this.directoryCacheInfo = this.formatCacheInfo(cachedAny.fetchedAt);
                         const directoryData = this.buildTreeData(cachedAny.tree || []);
                         this.directoryTreeHtml = this.renderDirectoryTreeHtml(directoryData);
@@ -677,16 +544,27 @@
                             this.directoryTreeHtml = '<p>The directory is empty or contains no Markdown files.</p>';
                         }
                     }
+
+                    if (!this.directoryTreeHtml && !this.directoryError) {
+                        const treeFilePath = this.getTreeFilePath() || 'mkdoc.tree.json';
+                        if (!this.config.GITHUB_OWNER || !this.config.GITHUB_REPO) {
+                            this.directoryError = this.isZh
+                                ? `无法加载目录：未找到 <code>${treeFilePath}</code>，且未配置 GitHub 仓库信息。请先生成并放置该文件，或在 <code>AppConfig</code> 中配置 <code>GITHUB_OWNER</code>/<code>GITHUB_REPO</code>。`
+                                : `Unable to load the directory: <code>${treeFilePath}</code> was not found, and GitHub repository settings are not configured. Please add the index file, or set <code>GITHUB_OWNER</code>/<code>GITHUB_REPO</code> in <code>AppConfig</code>.`;
+                        }
+                    }
                     this.isLoadingDirectory = false;
                 },
                 async refreshDirectory() {
-                    this.directoryCacheInfo = 'Refreshing directory...';
-                await this.displayDirectory(true);
-            },
-            clearDirectoryCache() {
-                this.clearCachedTree();
-                this.directoryCacheInfo = 'Cache cleared';
+                    this.directoryCacheInfo = this.t('refreshing');
+                    await this.displayDirectory(true);
+                },
+                clearDirectoryCache() {
+                    if (!confirm(this.t('confirm_clear_cache'))) return;
+                    this.clearCachedTree();
+                    this.directoryCacheInfo = this.t('cache_cleared');
                     this.directoryNotice = '';
+                    this.directoryDebug = '';
                 },
 
                 // --- 3. Markdown Rendering ---
@@ -747,12 +625,6 @@
                 },
                 async initializeApp() {
                     console.log("[AppInit] Initializing application...");
-                    if (!this.config.GITHUB_OWNER || !this.config.GITHUB_REPO) {
-                        this.directoryError = "<strong>Critical configuration error:</strong> GITHUB_OWNER or GITHUB_REPO is not set. Please check <code>AppConfig</code> or the inference logic.";
-                        this.isLoadingDirectory = false;
-                        console.error("[AppInit] CRITICAL CONFIG ERROR:", this.directoryError);
-                        return;
-                    }
                     await this.displayDirectory();
                     // Initial content load is now handled by created() calling handleHashChange()
                     console.log("[AppInit] Application initialized.");
