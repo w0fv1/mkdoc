@@ -15,6 +15,83 @@
     <script src="https://unpkg.com/vue@2.7.16/dist/vue.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.2.12/marked.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.8/purify.min.js"></script>
+    <style>
+        :root {
+            /* Match GitHub markdown dark background to avoid visible seams. */
+            --mkdoc-page-bg: #0d1117;
+            --mkdoc-sidebar-bg: #111827;
+            --mkdoc-scrollbar-thumb: rgba(203, 213, 225, 0.28);
+            --mkdoc-scrollbar-thumb-hover: rgba(203, 213, 225, 0.42);
+            --mkdoc-scrollbar-thumb-active: rgba(203, 213, 225, 0.55);
+        }
+
+        html,
+        body {
+            background: var(--mkdoc-page-bg);
+        }
+
+        #app {
+            background: var(--mkdoc-page-bg);
+        }
+
+        #sidebar {
+            background: var(--mkdoc-sidebar-bg);
+        }
+
+        #main-content {
+            background: var(--mkdoc-page-bg);
+            scrollbar-gutter: stable both-edges;
+        }
+
+        /* Use the parent container background so the content edges/bottom never show a different color. */
+        #content.markdown-body {
+            background-color: transparent !important;
+        }
+
+        /* iOS-like lightweight scrollbars (WebKit/Blink) */
+        #sidebar::-webkit-scrollbar,
+        #main-content::-webkit-scrollbar,
+        #directory-tree-container::-webkit-scrollbar {
+            width: 12px;
+            height: 12px;
+        }
+
+        #sidebar::-webkit-scrollbar-track,
+        #main-content::-webkit-scrollbar-track,
+        #directory-tree-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        #sidebar::-webkit-scrollbar-thumb,
+        #main-content::-webkit-scrollbar-thumb,
+        #directory-tree-container::-webkit-scrollbar-thumb {
+            background: var(--mkdoc-scrollbar-thumb);
+            border-radius: 999px;
+            border: 3px solid transparent;
+            background-clip: content-box;
+        }
+
+        #sidebar::-webkit-scrollbar-thumb:hover,
+        #main-content::-webkit-scrollbar-thumb:hover,
+        #directory-tree-container::-webkit-scrollbar-thumb:hover {
+            background: var(--mkdoc-scrollbar-thumb-hover);
+            background-clip: content-box;
+        }
+
+        #sidebar::-webkit-scrollbar-thumb:active,
+        #main-content::-webkit-scrollbar-thumb:active,
+        #directory-tree-container::-webkit-scrollbar-thumb:active {
+            background: var(--mkdoc-scrollbar-thumb-active);
+            background-clip: content-box;
+        }
+
+        #sidebar,
+        #main-content,
+        #directory-tree-container {
+            scrollbar-width: thin;
+            scrollbar-color: var(--mkdoc-scrollbar-thumb) transparent;
+        }
+    </style>
 </head>
 
 <body class="m-0 min-h-screen bg-slate-950 text-slate-200 font-sans">
